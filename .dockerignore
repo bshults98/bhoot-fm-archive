@@ -1,0 +1,34 @@
+# Don't ship the 11 GB of audio, dev venv, transcript sidecars, etc.
+audio/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.gitignore
+.env
+.idea/
+.vscode/
+*.tmp
+*.bak
+*.log
+
+# Source DB and ingestion-only files
+archive.db
+manifest.json
+transcripts/
+scripts/
+
+# Local-only
+*.docx
+*.json
+!static/**/*.json
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Docs that don't need to ship
+README.md

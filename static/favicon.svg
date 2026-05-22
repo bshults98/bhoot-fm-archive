@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="eye" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#ffe6e6"/>
+      <stop offset="35%" stop-color="#ff4040"/>
+      <stop offset="100%" stop-color="#6a0a0e"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%"  stop-color="#2a0608"/>
+      <stop offset="100%" stop-color="#07070b"/>
+    </radialGradient>
+  </defs>
+
+  <!-- rounded dark background -->
+  <rect width="64" height="64" rx="12" fill="url(#glow)"/>
+
+  <!-- ghost body: dome head + wavy tattered hem -->
+  <path d="
+      M12 30
+      Q12 12 32 12
+      Q52 12 52 30
+      L52 52
+      Q48 46 44 52
+      Q40 46 36 52
+      Q32 46 28 52
+      Q24 46 20 52
+      Q16 46 12 52
+      Z"
+    fill="#e8e4dc" opacity="0.92"/>
+
+  <!-- subtle inner shadow on ghost for depth -->
+  <path d="
+      M14 30
+      Q14 14 32 14
+      Q50 14 50 30
+      L50 48"
+    fill="none" stroke="#1a0306" stroke-width="0.6" opacity="0.25"/>
+
+  <!-- single glowing red eye -->
+  <ellipse cx="32" cy="30" rx="9" ry="11" fill="url(#eye)"/>
+  <ellipse cx="32" cy="30" rx="4" ry="6" fill="#0a0000"/>
+  <circle  cx="30" cy="27" r="1.6" fill="#fff" opacity="0.9"/>
+
+  <!-- tiny mouth -->
+  <ellipse cx="32" cy="44" rx="2.2" ry="3" fill="#1a0306"/>
+</svg>

@@ -1,0 +1,1130 @@
+/* ─── Theme ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #07070b;
+  --bg-grad: radial-gradient(ellipse at top, #160814 0%, #07070b 55%, #03030a 100%);
+  --bg-elev: #110f17;
+  --bg-elev-2: #1a1622;
+  --border: #2c1f2a;
+  --border-soft: #1c1721;
+  --text: #e8e3e8;
+  --text-dim: #8a8088;
+  --text-faint: #5a525a;
+  --blood: #b91c1c;
+  --blood-soft: #ff5757;
+  --blood-glow: rgba(255, 50, 50, 0.55);
+  --bone: #d9c9b1;
+  --player-h: 88px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; min-height: 100vh;
+  background: var(--bg);
+}
+body {
+  font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  color: var(--text);
+  padding-bottom: calc(var(--player-h) + env(safe-area-inset-bottom) + 20px);
+  overflow-x: hidden;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection { background: var(--blood); color: var(--bone); }
+
+/* ─── Background layers ─────────────────────────────────────────── */
+/* One static fixed-position blood-mist layer. No scanlines, no noise —
+   the cleaner background looks better and means one less compositor
+   pass per frame. */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(140, 16, 22, 0.16) 0%, transparent 40%),
+    radial-gradient(circle at 82% 78%, rgba(80, 4, 20, 0.14) 0%, transparent 44%),
+    radial-gradient(circle at 50% 110%, rgba(20, 4, 12, 0.28) 0%, transparent 58%);
+}
+/* Drip layer holds JS-spawned blood drops + secret easter eggs. */
+#drip-layer {
+  position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden;
+}
+
+header, main, .player-bar { position: relative; z-index: 1; }
+
+/* ─── Header ────────────────────────────────────────────────────── */
+header {
+  padding: 32px 24px 22px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(20, 8, 16, 0.85) 0%, rgba(7, 7, 11, 0.0) 100%);
+}
+.brand { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.brand .logo {
+  font-size: 38px;
+  color: var(--blood-soft);
+  text-shadow: 0 0 18px var(--blood-glow);
+  /* Drop-shadow filter removed — was forcing a per-frame GPU blur on
+     this constantly-blinking element. Text-shadow above gives the
+     same visual; it's painted once into the layer. */
+  animation: eye-blink 7s ease-in-out infinite;
+  cursor: pointer;
+  user-select: none;
+  /* Hint the browser to put this on its own compositor layer so the
+     opacity blink doesn't repaint the entire header. */
+  will-change: opacity;
+  transition: transform 0.2s;
+}
+.brand .logo:hover {
+  transform: scale(1.15) rotate(-3deg);
+  filter: drop-shadow(0 0 14px rgba(255, 110, 110, 0.7));
+}
+@keyframes eye-blink {
+  0%, 92%, 100% { opacity: 1; }
+  94%           { opacity: 0.15; }
+  96%           { opacity: 1; }
+}
+.brand h1 {
+  font-family: 'Creepster', 'Special Elite', cursive;
+  font-size: clamp(38px, 6vw, 56px);
+  margin: 0;
+  letter-spacing: 4px;
+  color: var(--bone);
+  /* Shrunk text-shadow blur radius — 40px blur was expanding the paint
+     rect to twice the title's size, forcing the compositor to handle
+     more pixels every frame the title's layer was touched. */
+  text-shadow:
+    0 0 4px rgba(255, 240, 220, 0.4),
+    0 0 14px rgba(185, 28, 28, 0.32);
+}
+.brand h1 .accent {
+  color: var(--blood-soft);
+  text-shadow: 0 0 6px var(--blood-glow), 0 0 24px var(--blood-glow);
+}
+/* Cheap flicker — only opacity. The previous animation tweened the
+   text-shadow blur radius from 50px to 0 every 6s, which forced the
+   GPU to re-rasterize the big glowing title every frame during each
+   transition. Opacity-only flicker has the same visual effect at
+   ~zero cost — plus will-change promotes it to its own compositor
+   layer so the heavy text-shadow only paints once. */
+.title-flicker {
+  animation: flicker 6s infinite;
+  will-change: opacity;
+}
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55%                          { opacity: 0.55; }
+}
+.brand .tagline {
+  margin: 0;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 13px;
+  color: var(--text-faint);
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  /* Fixed height + single line so the layout never shifts when the
+     rotating taglines change (English vs. Bangla have different
+     intrinsic line heights, and longer phrases used to wrap). */
+  height: 1.8em;
+  line-height: 1.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 92vw;
+  will-change: opacity;
+  contain: layout paint;
+}
+
+/* ─── Search ────────────────────────────────────────────────────── */
+.search {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; max-width: 720px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.search input {
+  flex: 1; min-width: 220px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 15px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', 'Inter', serif;
+  letter-spacing: 1px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 44px;
+}
+.search input::placeholder { color: var(--text-faint); font-style: italic; }
+.search input:focus {
+  outline: none;
+  border-color: var(--blood);
+  box-shadow: 0 0 0 1px var(--blood), 0 0 18px rgba(185, 28, 28, 0.35);
+}
+.search button {
+  background: var(--blood);
+  color: var(--bone);
+  border: 1px solid #6b1010;
+  padding: 11px 22px;
+  border-radius: 4px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-weight: 600;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.06s;
+  text-transform: uppercase;
+  font-size: 13px;
+  min-height: 44px;
+}
+.search button:hover { background: #d62525; box-shadow: 0 0 18px rgba(255, 50, 50, 0.5); }
+.search button:active { transform: translateY(1px); }
+.icon-btn {
+  background: var(--bg-elev);
+  color: var(--blood-soft);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.3s;
+  min-height: 44px;
+}
+.icon-btn:hover {
+  border-color: var(--blood);
+  box-shadow: 0 0 14px -4px var(--blood-glow);
+  transform: rotate(180deg);
+}
+/* (.filter / "indexed only" removed — all episodes are indexed now.) */
+
+/* Bengali sub-name under the title (visible, helps both UX & SEO). */
+.alt-name {
+  margin: 0;
+  font-family: 'Noto Sans Bengali', 'Special Elite', serif;
+  font-size: 14px;
+  color: var(--blood-soft);
+  letter-spacing: 2px;
+  opacity: 0.85;
+  text-shadow: 0 0 10px var(--blood-glow);
+}
+
+/* How-to-use hint sits under the search box, gentle introduction. */
+.how-to {
+  margin: 4px 0 0;
+  max-width: 620px;
+  text-align: center;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 13px;
+  color: var(--text-faint);
+  letter-spacing: 0.4px;
+  line-height: 1.55;
+}
+.how-to .how-bn {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Noto Sans Bengali', sans-serif;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.how-to strong { color: var(--blood-soft); font-weight: 600; }
+.how-eg {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--blood-soft);
+  font-family: 'Noto Sans Bengali', sans-serif;
+  font-size: 13px;
+  padding: 1px 8px;
+  margin: 0 1px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.how-eg:hover {
+  border-color: var(--blood);
+  background: rgba(185, 28, 28, 0.12);
+}
+.how-to .how-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--blood-soft);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* Credits section — lives at the bottom of the content area. */
+.credits {
+  margin: 56px auto 24px;
+  max-width: 720px;
+  text-align: center;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0.4px;
+  padding: 24px 16px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.credits-h {
+  font-family: 'Creepster', 'Noto Sans Bengali', cursive;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--blood-soft);
+  margin: 0 0 14px;
+  text-shadow: 0 0 12px var(--blood-glow);
+}
+.credits p { margin: 0 0 10px; }
+.credits p[lang="bn"] {
+  font-family: 'Noto Sans Bengali', sans-serif;
+  line-height: 1.85;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+.credits strong { color: var(--text-dim); font-weight: 600; }
+.credits a { color: var(--blood-soft); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.credits a:hover { color: var(--blood); }
+.credits .thanks { color: var(--text-dim); }
+.credits .copyright {
+  margin-top: 18px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.credits .copyright span { color: var(--blood-soft); margin-left: 4px; }
+
+.kbd-hint {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .kbd-hint { display: block; }
+}
+.kbd-hint kbd {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-size: 10px;
+  color: var(--bone);
+}
+
+/* ─── Main ──────────────────────────────────────────────────────── */
+main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
+.status {
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  letter-spacing: 1px;
+  min-height: 1.2em;
+}
+.hidden { display: none !important; }
+
+/* ─── Cards ─────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
+  position: relative;
+  overflow: hidden;
+  /* Off-screen cards are skipped during paint/layout entirely. Huge
+     win when there are 488 episode cards but only a dozen visible. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 70px;
+}
+.card::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 6px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 70, 70, 0.0) 0%, rgba(255, 70, 70, 0.06) 50%, rgba(255, 70, 70, 0.0) 100%);
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: opacity 0.18s, transform 0.6s;
+}
+.card:hover { border-color: var(--blood); box-shadow: 0 0 0 1px rgba(185, 28, 28, 0.4), 0 0 28px -8px var(--blood-glow); }
+.card:hover::before { opacity: 1; transform: translateX(100%); }
+.card-appear { animation: card-rise 0.5s ease forwards; opacity: 0; }
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.card-date {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.card-title {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--bone);
+  letter-spacing: 1px;
+}
+.card-count {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  color: var(--blood-soft);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ─── Markers ───────────────────────────────────────────────────── */
+.markers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.marker {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--blood-soft);
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 1.5px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.06s;
+  font-variant-numeric: tabular-nums;
+  min-height: 36px;
+}
+.marker::before { content: "▶"; font-size: 9px; opacity: 0.7; }
+.marker:hover {
+  background: rgba(185, 28, 28, 0.18);
+  border-color: var(--blood);
+  box-shadow: 0 0 14px -2px var(--blood-glow);
+}
+.marker:active { transform: scale(0.97); }
+.marker.active {
+  background: var(--blood);
+  color: var(--bone);
+  border-color: var(--blood);
+  box-shadow: 0 0 22px -4px var(--blood-glow);
+}
+/* (Looping box-shadow pulses removed — animating shadow blur radius
+   forces the GPU to re-rasterize the halo every frame. The static
+   shadow already gives the markers their bloody glow.) */
+
+/* ─── Episode card ──────────────────────────────────────────────── */
+.episode-card {
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+}
+.episode-card .ep-segs {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+/* ─── Transcript / marker grid view ─────────────────────────────── */
+.transcript .back-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 9px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 14px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  letter-spacing: 1.5px;
+  font-size: 12px;
+  text-transform: uppercase;
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  min-height: 38px;
+}
+.transcript .back-btn:hover {
+  color: var(--bone);
+  border-color: var(--blood);
+  box-shadow: 0 0 14px -4px var(--blood-glow);
+}
+.transcript h2 {
+  margin: 0 0 4px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--bone);
+  letter-spacing: 2px;
+  font-size: clamp(20px, 4vw, 28px);
+}
+.t-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-bottom: 20px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.t-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.t-grid .marker {
+  justify-content: center;
+  padding: 14px 8px;
+  font-size: 13px;
+  /* Skip paint for markers scrolled off-screen — a typical episode
+     has 200+ markers but only ~30 are on screen at any time. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+/* Marker + its "share this timestamp" sibling, treated as one cell. */
+.marker-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+.marker-group .marker {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Square off the side that touches the share button. */
+  border-radius: 4px 0 0 4px;
+}
+.marker-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  padding: 0 8px;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.06s;
+  /* Faded by default; brightens on group hover so it's discoverable but
+     doesn't shout. On touch devices (no hover) it stays at full opacity. */
+  opacity: 0.45;
+}
+.marker-group:hover .marker-share,
+.marker-share:focus-visible { opacity: 1; }
+.marker-share:hover {
+  background: rgba(185, 28, 28, 0.18);
+  border-color: var(--blood);
+  color: var(--blood-soft);
+}
+.marker-share:active { transform: scale(0.94); }
+.marker-share.copied {
+  background: var(--blood);
+  color: var(--bone);
+  border-color: var(--blood);
+}
+.marker-share.copy-failed {
+  border-color: var(--blood);
+  color: var(--blood-soft);
+}
+@media (hover: none) {
+  .marker-share { opacity: 0.8; }
+}
+
+/* ─── Player bar ────────────────────────────────────────────────── */
+.player-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  /* Solid (almost) bg instead of backdrop-filter blur — same look at
+     a fraction of the GPU cost. */
+  background: linear-gradient(180deg, #160a12 0%, #07070b 100%);
+  border-top: 1px solid var(--border);
+  padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 16px;
+  height: calc(var(--player-h) + env(safe-area-inset-bottom));
+  z-index: 20;
+}
+/* Audio-reactive dial — a canvas. The glow used to be an animated
+   filter: drop-shadow which forces a per-frame GPU blur on the whole
+   element. Static box-shadow on a wrapper is effectively free. */
+.dial {
+  width: 36px; height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 10px -1px var(--blood-glow);
+  cursor: pointer;
+  transform: translateZ(0);
+  /* contain:layout stops repaints spreading to the rest of the bar. */
+  contain: layout style;
+}
+.now {
+  min-width: 0;
+  flex: 0 1 280px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.now:hover { opacity: 0.75; }
+.now-title {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-weight: 600;
+  color: var(--bone);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-meta {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 3px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-bar audio { display: none; }
+
+/* ── Expand button ──────────────────────────────────────────────── */
+.expand-btn {
+  display: grid; place-items: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, transform 0.2s;
+}
+.expand-btn:hover       { color: var(--bone); border-color: var(--blood); }
+.expand-btn.active      { color: var(--blood-soft); border-color: var(--blood);
+                           transform: rotate(180deg); }
+
+/* ── Expanded now-playing panel ─────────────────────────────────── */
+.expanded-player {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  /* Deep dark background with a very faint warm-red tint at the top. */
+  background: radial-gradient(ellipse at 50% 40%, #150608 0%, #07070b 65%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px calc(var(--player-h) + 24px);
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+  overflow: hidden;
+}
+.expanded-player.open { transform: translateY(0); }
+
+.collapse-btn {
+  position: absolute;
+  top: 20px; left: 50%; transform: translateX(-50%);
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.collapse-btn:hover { color: var(--bone); border-color: var(--blood); }
+
+/* Ghost watermark — breathes slowly behind the card. */
+.exp-ghost {
+  position: absolute;
+  font-size: clamp(240px, 45vw, 420px);
+  line-height: 1;
+  color: var(--blood);
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -52%);
+  filter: blur(3px);
+  animation: exp-ghost-breathe 5s ease-in-out infinite;
+}
+@keyframes exp-ghost-breathe {
+  0%, 100% { opacity: 0.055; transform: translate(-50%, -52%) scale(1.00); }
+  50%       { opacity: 0.090; transform: translate(-50%, -52%) scale(1.05); }
+}
+
+/* Card — sits above the ghost watermark. */
+.exp-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: min(640px, 88vw);
+  text-align: center;
+}
+
+/* "▶ NOW PLAYING" label */
+.exp-now-playing {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 10px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--blood-soft);
+  opacity: 0.75;
+  margin: 0;
+}
+
+/* Episode title */
+.exp-ep-title {
+  font-family: 'Creepster', 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: clamp(28px, 7vw, 58px);
+  color: var(--bone);
+  letter-spacing: 3px;
+  line-height: 1.15;
+  text-shadow:
+    0 0 60px rgba(255, 50, 50, 0.55),
+    0 0 20px rgba(255, 30, 30, 0.35),
+    0 2px  8px rgba(0, 0, 0, 0.8);
+  animation: title-flicker 9s ease-in-out infinite;
+}
+
+/* Date / duration */
+.exp-ep-meta {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0;
+}
+
+/* Custom controls (Spotify-style). */
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.play-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bone);
+  color: #0b0306;
+  display: grid; place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.12s, box-shadow 0.2s, background 0.15s;
+  box-shadow: 0 0 0 0 var(--blood-glow);
+}
+.play-btn:hover {
+  transform: scale(1.05);
+  background: #fff;
+  box-shadow: 0 0 18px -2px var(--blood-glow);
+}
+.play-btn:active { transform: scale(0.96); }
+.play-btn .icon-pause { display: none; }
+.play-btn.playing .icon-play  { display: none; }
+.play-btn.playing .icon-pause { display: block; }
+.skip-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  display: grid; place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.skip-btn:hover:not(:disabled) {
+  color: var(--bone);
+  border-color: var(--blood);
+}
+.skip-btn:active:not(:disabled) { transform: scale(0.93); }
+.skip-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.scrubber-wrap {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.time-cur, .time-dur {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 1px;
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.time-dur { color: var(--text-dim); }
+.scrubber {
+  flex: 1;
+  height: 24px;            /* large hit area for touch */
+  display: flex; align-items: center;
+  cursor: pointer;
+  position: relative;
+  touch-action: none;       /* we handle pointer events */
+  outline: none;
+}
+.scrubber-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: visible;
+  transition: height 0.15s;
+}
+.scrubber:hover .scrubber-track,
+.scrubber:focus-visible .scrubber-track,
+.scrubber.dragging .scrubber-track { height: 6px; }
+.scrubber-buffer {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 0;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.scrubber-fill {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--blood-soft), var(--blood));
+  border-radius: 999px;
+  box-shadow: 0 0 8px -1px var(--blood-glow);
+}
+.scrubber-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12px; height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--bone);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 10px -1px var(--blood-glow);
+}
+.scrubber:hover .scrubber-thumb,
+.scrubber:focus-visible .scrubber-thumb,
+.scrubber.dragging .scrubber-thumb {
+  opacity: 1;
+  transform: scale(1);
+}
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+.ghost-btn:hover {
+  border-color: var(--blood);
+  color: var(--blood-soft);
+  box-shadow: 0 0 14px -4px var(--blood-glow);
+}
+
+/* ─── States ────────────────────────────────────────────────────── */
+.empty { padding: 60px 16px; text-align: center; color: var(--text-dim); font-family: 'Special Elite', 'Noto Sans Bengali', serif; }
+.empty-hint {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-faint);
+  display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+  max-width: 460px;
+}
+.empty-hint strong { color: var(--blood-soft); }
+.empty h2 {
+  font-family: 'Creepster', 'Noto Sans Bengali', cursive;
+  color: var(--blood-soft);
+  margin: 0 0 12px;
+  font-size: 28px;
+  letter-spacing: 3px;
+}
+.loading::before {
+  content: "▒";
+  display: inline-block;
+  margin-right: 8px;
+  animation: ghost-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ghost-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+.error {
+  color: var(--blood-soft);
+  background: rgba(185, 28, 28, 0.08);
+  border: 1px solid rgba(185, 28, 28, 0.3);
+  padding: 12px 14px;
+  border-radius: 4px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+}
+
+/* ─── Mobile ────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  header { padding: 22px 14px 16px; gap: 14px; }
+  .search input { min-width: 0; flex: 1 1 100%; }
+  .search button[type="submit"] { flex: 1 1 100%; }
+  .icon-btn { padding: 12px 16px; }
+  main { padding: 18px 14px; }
+  .card { padding: 14px 14px; }
+  .card-title { font-size: 16px; }
+  .markers .marker { padding: 10px 12px; font-size: 13px; min-height: 40px; }
+  .t-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  .player-bar { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); gap: 10px; }
+  .dial { width: 30px; height: 30px; }
+  .now { flex: 0 1 140px; }
+  .now-meta { font-size: 10px; }
+  .ghost-btn { padding: 8px 10px; }
+}
+
+/* ── Mobile: three-row player layout.
+   Row 1 — dial · title · expand-button
+   Row 2 — ⏮ ⏸ ⏭  (centred, large touch targets)
+   Row 3 — scrubber full width                       */
+@media (max-width: 720px) {
+  .player-bar {
+    --player-h: auto;
+    flex-wrap: wrap;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    align-items: center;
+    height: auto;
+    row-gap: 10px;
+    column-gap: 10px;
+  }
+  /* Row 1 */
+  .dial        { order: 1; width: 36px; height: 36px; flex-shrink: 0; }
+  .now         { order: 2; flex: 1 1 0; min-width: 0; }
+  .expand-btn  { order: 3; flex-shrink: 0; }
+  /* Row 2 — full-width centred controls */
+  .player-controls {
+    order: 4;
+    flex: 0 0 100%;
+    justify-content: center;
+    gap: 24px;
+  }
+  .player-controls .skip-btn {
+    width: 44px; height: 44px;
+  }
+  .player-controls .play-btn {
+    width: 56px; height: 56px;
+  }
+  /* Row 3 */
+  .scrubber-wrap { order: 5; flex: 0 0 100%; }
+
+  .exp-ghost { font-size: 180px; }
+  .exp-ep-title { font-size: clamp(26px, 8vw, 42px); }
+}
+
+@media (max-width: 420px) {
+  .brand h1 { letter-spacing: 2px; }
+  .brand .tagline { font-size: 11px; letter-spacing: 3px; }
+}
+
+/* ─── Easter eggs & blood ───────────────────────────────────────── */
+
+/* Screen-edge bleed — flickered onto <body> when a horror word is typed
+   or another rare trigger fires. Pure CSS; no JS loop. */
+body.bleeding::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 9997; pointer-events: none;
+  box-shadow:
+    inset 0 0 90px 30px rgba(140, 14, 14, 0.55),
+    inset 0 0 200px 60px rgba(80, 0, 6, 0.4);
+  animation: bleed-flash 1.2s ease-out forwards;
+}
+@keyframes bleed-flash {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Witching hour — slightly redder, dimmer. */
+body.witching-hour { filter: brightness(0.92) hue-rotate(-6deg); }
+
+/* Click burst — a tiny outward ripple of red, spawned in JS on every
+   pointerdown. CSS does all the animation. */
+.click-burst {
+  position: absolute;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 80, 80, 0.9) 0%, rgba(185, 28, 28, 0.5) 60%, transparent 100%);
+  animation: click-burst 0.6s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes click-burst {
+  0%   { transform: scale(0.4); opacity: 0.9; box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.5); }
+  60%  { opacity: 0.6; }
+  100% { transform: scale(4.5); opacity: 0; box-shadow: 0 0 0 14px rgba(185, 28, 28, 0); }
+}
+
+/* Blood drop — falls from x,y, leaves a faint streak, fades out. */
+.blood-drop {
+  position: absolute;
+  width: var(--w, 2px);
+  height: 4px;
+  margin-left: calc(var(--w, 2px) / -2);
+  background: linear-gradient(180deg, #4a0408 0%, #b3171b 60%, #ff3838 100%);
+  border-radius: 50% 50% 40% 40% / 30% 30% 70% 70%;
+  box-shadow: 0 0 6px rgba(185, 28, 28, 0.6);
+  animation: blood-fall 1s ease-in forwards;
+  will-change: transform, opacity;
+}
+@keyframes blood-fall {
+  0%   { transform: translateY(0) scaleY(0.4); opacity: 0; }
+  15%  { opacity: 1; }
+  60%  { transform: translateY(calc(var(--fall, 120px) * 0.6)) scaleY(1.2); }
+  100% { transform: translateY(var(--fall, 120px)) scaleY(0.8); opacity: 0; }
+}
+
+/* Shadow figure — drifts across the bottom of the page when audio plays. */
+.shadow-figure {
+  position: absolute;
+  top: var(--y);
+  left: var(--from);
+  width: 22px; height: 60px;
+  background: radial-gradient(ellipse at 50% 30%,
+    rgba(0,0,0,0.85) 0%,
+    rgba(0,0,0,0.55) 45%,
+    rgba(0,0,0,0) 75%);
+  filter: blur(2.5px);
+  animation: shadow-drift var(--dur) linear forwards;
+  opacity: 0.65;
+}
+.shadow-figure.reversed { animation-direction: reverse; }
+@keyframes shadow-drift {
+  0%   { transform: translateX(0); opacity: 0; }
+  15%  { opacity: 0.65; }
+  85%  { opacity: 0.65; }
+  100% { transform: translateX(calc(var(--to) - var(--from))); opacity: 0; }
+}
+
+/* Whisper toast — a fading hand-written line in the lower-left. */
+.whisper-toast {
+  position: fixed;
+  left: 50%; bottom: 22%;
+  transform: translateX(-50%);
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 16px;
+  letter-spacing: 4px;
+  color: var(--blood-soft);
+  text-shadow: 0 0 14px var(--blood-glow), 0 0 4px rgba(0,0,0,0.8);
+  opacity: 0;
+  animation: whisper-fade 4.5s ease-out forwards;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@keyframes whisper-fade {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(8px); letter-spacing: 8px; }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(0); letter-spacing: 4px; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; letter-spacing: 6px; }
+}
+
+/* Marker bleeds a tiny drop on hover — playful blood detail. */
+.marker { position: relative; }
+.marker:hover::after {
+  content: "";
+  position: absolute;
+  bottom: -3px; left: 50%; transform: translateX(-50%);
+  width: 2px; height: 4px;
+  background: var(--blood);
+  border-radius: 0 0 50% 50%;
+  box-shadow: 0 0 6px var(--blood-glow);
+  animation: marker-drip 0.7s ease-in forwards;
+}
+@keyframes marker-drip {
+  0%   { opacity: 0; transform: translate(-50%, -2px) scaleY(0); }
+  30%  { opacity: 1; transform: translate(-50%, 0) scaleY(1); }
+  100% { opacity: 0; transform: translate(-50%, 8px) scaleY(0.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ─── /about page ───────────────────────────────────────────────── */
+body.about-page { padding-bottom: 60px; }   /* no player bar */
+.about-page .brand .logo {
+  text-decoration: none;
+  display: inline-block;
+}
+.about-main { max-width: 740px; margin: 0 auto; padding: 28px 22px; }
+.about h2 {
+  font-family: 'Creepster', 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--blood-soft);
+  margin: 32px 0 10px;
+  text-shadow: 0 0 12px var(--blood-glow);
+}
+.about h2:first-of-type { margin-top: 8px; }
+.about p {
+  line-height: 1.7;
+  color: var(--text);
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+.about p em { color: var(--text-dim); font-style: italic; }
+.about a {
+  color: var(--blood-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--blood);
+}
+.about a:hover { color: var(--bone); border-bottom-color: var(--bone); }
+.credit-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 18px;
+  display: grid;
+  gap: 10px;
+}
+.credit-list li {
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--blood);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.credit-list li strong { color: var(--text); }
+.back-link {
+  margin-top: 40px;
+  text-align: center;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.back-link a { border-bottom: none; }
+.about-link {
+  color: var(--text-faint);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+  margin-left: 4px;
+}
+.about-link:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }

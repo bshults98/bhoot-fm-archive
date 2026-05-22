@@ -1,0 +1,41 @@
+# Fly.io app config. Generated for the BhootFM Archive.
+# The app name will be assigned on first `fly launch`; this template uses a
+# placeholder you (or `fly launch`) replaces.
+app = "bhoot-fm-archive"
+primary_region = "sin"   # Singapore — closest free region to Bangladesh
+
+[build]
+
+[env]
+PORT = "8080"
+BFA_PUBLIC_URL = "https://bhoot-fm-archive.fly.dev"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = "stop"      # save free-tier hours; cold start ~3 sec
+auto_start_machines = true
+min_machines_running = 0
+processes = ["app"]
+
+[http_service.concurrency]
+# Tuned for a 256 MB shared-cpu-1x box. Each FastAPI request handler runs
+# in uvicorn's threadpool and costs a few MB of working memory; ~60 in
+# flight is the realistic ceiling before OOM. Fly queues requests above
+# soft_limit and starts a second machine if scaling is enabled.
+type = "requests"
+hard_limit = 60
+soft_limit = 30
+
+# Cheap liveness probe — no DB hit, just confirms the process is up.
+# Fly polls this to decide whether a stopped machine should be restarted.
+[[http_service.checks]]
+grace_period = "10s"
+interval = "30s"
+method = "GET"
+timeout = "5s"
+path = "/healthz"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "256mb"                  # free tier
