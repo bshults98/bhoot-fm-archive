@@ -1089,6 +1089,52 @@
       card.addEventListener("touchmove", cancelPress);
       card.addEventListener("touchcancel", cancelPress);
     });
+    wireFriday13thBlinks(container);
+  }
+
+  // Random-interval power-surge flicker for Friday-the-13th cards. CSS-only
+  // animations always run on a fixed loop, which the eye learns to tune out
+  // — interleaving real randomness makes the suspense actually land. Each
+  // F13 card schedules its own next flicker between 3 and 11 seconds away,
+  // sometimes with a fast double-blink for extra dread. We bail on reduced-
+  // motion and clean up timers when the card leaves the DOM via a sentinel.
+  function wireFriday13thBlinks(container) {
+    const prefersReduced =
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+    container.querySelectorAll(".episode-card.friday-13th").forEach(card => {
+      if (card.dataset.f13Wired) return;
+      card.dataset.f13Wired = "1";
+
+      const aliveSentinel = () => card.isConnected;
+      const scheduleNext = () => {
+        if (!aliveSentinel()) return;
+        // 3–11 s gap. Cluster the short end with Math.pow for more frequent
+        // near-misses that keep the user just on edge.
+        const wait = 3000 + Math.pow(Math.random(), 1.4) * 8000;
+        setTimeout(() => {
+          if (!aliveSentinel()) return;
+          card.classList.add("blinking");
+          setTimeout(() => {
+            card.classList.remove("blinking");
+            // ~22% chance of an immediate second flick (a "dying-bulb" stutter).
+            if (Math.random() < 0.22 && aliveSentinel()) {
+              setTimeout(() => {
+                if (!aliveSentinel()) return;
+                card.classList.add("blinking");
+                setTimeout(() => card.classList.remove("blinking"), 70);
+                scheduleNext();
+              }, 130);
+            } else {
+              scheduleNext();
+            }
+          }, 90);
+        }, wait);
+      };
+      // Stagger initial starts so all F13 cards don't blink in sync on first load.
+      setTimeout(scheduleNext, 500 + Math.random() * 4000);
+    });
   }
 
   async function renderSearch(q) {

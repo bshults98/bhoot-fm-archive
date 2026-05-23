@@ -1974,7 +1974,13 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
   box-shadow:
     0 0 22px -4px var(--blood-glow),
     inset 0 0 30px -8px rgba(185, 28, 28, 0.4);
-  animation: f13-pulse 3.8s ease-in-out infinite;
+  /* Include card-rise as the first animation so F13 cards still fade in
+     from opacity:0 like every other card — the animation shorthand isn't
+     additive, so declaring only f13-pulse here would override the rise
+     animation that .card-appear sets and leave the card invisible. */
+  animation:
+    card-rise 0.5s ease forwards,
+    f13-pulse 3.8s ease-in-out infinite;
 }
 .episode-card.friday-13th .card-title {
   color: #ffe6e6;
@@ -2015,6 +2021,10 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
   21%                           { opacity: 1;    }
 }
 @media (prefers-reduced-motion: reduce) {
-  .episode-card.friday-13th        { animation: none; }
+  /* Kill the F13 + rise animations, but keep the card visible. Without the
+     explicit opacity, the inline `opacity: 0` on .card-appear would leave
+     the card invisible since the rise animation that would have set it to
+     1 is also disabled here. */
+  .episode-card.friday-13th        { animation: none; opacity: 1; }
   .episode-card.friday-13th .f13-mark { animation: none; }
 }
