@@ -1,0 +1,40 @@
+# Keeps the Hugging Face Space from going to sleep.
+#
+# HF free-tier Spaces sleep after ~48h of no traffic; a cold boot of the Docker
+# image takes 30-60 seconds, which the first listener on a Friday night will
+# experience as a broken site. Any HTTP request — even to /healthz — resets
+# the inactivity timer, so we ping cheaply on a schedule.
+#
+# Runs as a GitHub Action so we don't have to host the cron ourselves. No
+# secrets needed; /healthz is public.
+#
+# The 'workflow_dispatch' trigger lets you also run it manually from the
+# Actions tab when you want to warm the box up before a deploy or share.
+
+name: keep-warm
+
+on:
+  schedule:
+    # Twice daily is plenty to reset the 48h timer. Times are UTC.
+    # 14:00 UTC = 20:00 Asia/Dhaka (peak listening starts to ramp).
+    # 02:00 UTC = 08:00 Asia/Dhaka (catches the morning).
+    - cron: "0 14 * * *"
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the Space
+        run: |
+          set -eu
+          URL="https://xer2ten-bhoot-fm-archive.hf.space/healthz"
+          # First request triggers the cold boot and may take a while; allow
+          # up to two minutes before failing. -f turns 4xx/5xx into a non-zero
+          # exit so the job actually shows as red when the Space is broken.
+          echo "Pinging $URL ..."
+          curl -fsSL --max-time 120 --retry 3 --retry-delay 15 "$URL"
+          echo
+          echo "Space is awake."

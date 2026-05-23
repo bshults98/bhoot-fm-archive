@@ -2,5 +2,8 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-docx==1.1.2
 pydantic==2.10.4
+# Optional: only activates if SENTRY_DSN is set in the Space secrets.
+# Server.py imports it lazily, so installing it does nothing on its own.
+sentry-sdk==2.19.2
 # upload-to-archive.py only; not needed in production image
 internetarchive==5.6.0

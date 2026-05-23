@@ -18,6 +18,7 @@
 <meta name="geo.region" content="BD" />
 <meta name="geo.placename" content="Bangladesh" />
 <link rel="canonical" id="canonical" href="/" />
+<link rel="alternate" type="application/rss+xml" title="Bhoot FM Archive — podcast feed" href="/podcast.xml" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -116,18 +117,20 @@
     <p class="tagline" id="rotating-tagline" aria-live="polite">search and listen where you dare</p>
   </div>
   <form class="search" id="search-form" autocomplete="off" role="search">
-    <input type="search" id="q" placeholder="Search in Bangla — try হাসপাতাল…" aria-label="Search episodes" maxlength="120" />
+    <input type="search" id="q" placeholder="Search Bangla or Banglish — try হাসপাতাল or hospital…" aria-label="Search episodes (Bangla or Banglish)" maxlength="120" />
     <button type="button" id="random-btn" class="icon-btn" title="Random episode (press R)" aria-label="Random episode">⚄</button>
     <button type="submit" title="Search inside every episode" aria-label="Search episodes">⌖ Search</button>
   </form>
   <p class="how-to" id="how-to" lang="en">
-    Search inside every episode <strong>in Bangla</strong> —
-    try <button type="button" class="how-eg" data-q="অ্যাম্বুলেন্স">অ্যাম্বুলেন্স</button>,
-    <button type="button" class="how-eg" data-q="হাসপাতাল">হাসপাতাল</button>, or
-    <button type="button" class="how-eg" data-q="বাড়ি">বাড়ি</button>.
+    Search inside every episode in <strong>Bangla</strong> or
+    <strong>Banglish</strong> (English letters) —
+    try <button type="button" class="how-eg" data-q="bhoot">bhoot</button>,
+    <button type="button" class="how-eg" data-q="হাসপাতাল">হাসপাতাল</button>,
+    <button type="button" class="how-eg" data-q="ambulance">ambulance</button>, or
+    <button type="button" class="how-eg" data-q="কবর">কবর</button>.
     Tap any <span class="how-chip">⏱ timestamp</span> to jump to that moment.
     <span class="how-bn" lang="bn">
-      বাংলায় লিখে সব এপিসোডের ভেতরে খুঁজুন।
+      বাংলা বা ইংরেজি অক্ষরে (Banglish) লিখে সব এপিসোডের ভেতরে খুঁজুন।
       যেকোনো <span class="how-chip">⏱ টাইমস্ট্যাম্প</span> চাপলে সরাসরি সেই মুহূর্তে চলে যাবে।
     </span>
   </p>
@@ -146,8 +149,9 @@
       <div class="first-run-label">𓁹 New here? Here's how it works</div>
       <p class="first-run-lede">
         Every Bhoot FM episode is on this page. The whole audio is searchable —
-        type a Bangla word and you'll see <em>exactly which episodes</em> say it,
-        and <em>when</em>.
+        type a word in <strong>Bangla</strong> or <strong>Banglish</strong>
+        (English letters, e.g. <em>hospital</em>, <em>bari</em>) and you'll see
+        <em>exactly which episodes</em> say it, and <em>when</em>.
       </p>
       <ol class="first-run-steps">
         <li>
@@ -155,7 +159,9 @@
           <div>
             Search for a word like
             <button type="button" class="how-eg" data-q="হাসপাতাল">হাসপাতাল</button>
-            <span class="step-hint">(“hospital”)</span>
+            or
+            <button type="button" class="how-eg" data-q="hospital">hospital</button>
+            <span class="step-hint">(both work)</span>
           </div>
         </li>
         <li>
@@ -289,6 +295,7 @@
       original creators — Radio Foorti and the Bhoot FM team.
       <span aria-hidden="true">𓁹</span>
       &nbsp;·&nbsp; <a href="/about.html" class="about-link">about &amp; takedown</a>
+      &nbsp;·&nbsp; <a href="/podcast.xml" class="about-link" title="Subscribe in your podcast app">podcast feed</a>
       &nbsp;·&nbsp; <button type="button" class="about-link reset-history-btn" id="reset-history-btn" title="Clear listening history on this device">reset listening history</button>
     </p>
     <p class="device-note">

@@ -629,6 +629,101 @@ def robots():
     )
 
 
+@app.get("/podcast.xml")
+def podcast_feed():
+    """iTunes-flavored RSS feed for podcast apps.
+
+    Each episode becomes an <item> with an <enclosure> pointing at the IA URL,
+    so subscribers can stream the full archive from Apple Podcasts, Pocket
+    Casts, AntennaPod, Overcast, etc. Audio bytes never come through us — the
+    feed is just the index that tells podcast players where to fetch.
+
+    Only includes episodes that point at an external (IA / dl.bhoot-fm.com)
+    URL — locally-served mp3s would force traffic through this box and
+    defeat the point of off-loading hosting to IA.
+    """
+    base = PUBLIC_URL or ""
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, air_date, title, mp3_url, duration_sec "
+            "FROM episodes "
+            "WHERE mp3_url LIKE 'http%' "
+            "ORDER BY air_date DESC"
+        ).fetchall()
+
+    def rfc2822(date_str: str, idx: int) -> str:
+        # Air dates are stored as YYYY-MM-DD. Podcast clients want RFC-2822
+        # timestamps. Spread episodes one minute apart inside the day so the
+        # client-side sort is deterministic when several share an air_date.
+        try:
+            y, m, d = (int(x) for x in date_str.split("-"))
+        except Exception:
+            return "Mon, 01 Jan 2007 00:00:00 +0000"
+        from datetime import datetime, timezone, timedelta
+        return (datetime(y, m, d, 23, 0, tzinfo=timezone.utc)
+                + timedelta(minutes=idx)).strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+    items_xml = []
+    for i, r in enumerate(rows):
+        title = r["title"] or f"Bhoot FM — {r['air_date']}"
+        guid = f"{base}/episode/{r['id']}" if base else f"/episode/{r['id']}"
+        page = f"{base}/episode/{r['id']}" if base else f"/episode/{r['id']}"
+        duration = int(r["duration_sec"] or 0)
+        items_xml.append(
+            "<item>"
+            f"<title>{html.escape(title)}</title>"
+            f"<link>{html.escape(page)}</link>"
+            f"<guid isPermaLink=\"true\">{html.escape(guid)}</guid>"
+            f"<pubDate>{rfc2822(r['air_date'] or '2007-01-01', i)}</pubDate>"
+            f"<enclosure url=\"{html.escape(r['mp3_url'])}\" "
+            f'type="audio/mpeg" length="0" />'
+            f"<itunes:duration>{duration}</itunes:duration>"
+            f"<itunes:author>RJ Russell</itunes:author>"
+            f"<itunes:explicit>false</itunes:explicit>"
+            f"<description>Bhoot FM episode aired on {html.escape(r['air_date'] or '')}, "
+            f"hosted by RJ Russell on Radio Foorti 88.0 FM. Listener-submitted "
+            f"Bangla ghost stories and paranormal encounters.</description>"
+            "</item>"
+        )
+
+    cover = f"{base}/og-image.png" if base else "/og-image.png"
+    feed_url = f"{base}/podcast.xml" if base else "/podcast.xml"
+    site = base or "/"
+
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" '
+        'xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" '
+        'xmlns:atom="http://www.w3.org/2005/Atom" '
+        'xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
+        '<channel>\n'
+        '<title>Bhoot FM Archive</title>\n'
+        f'<link>{html.escape(site)}</link>\n'
+        f'<atom:link href="{html.escape(feed_url)}" rel="self" type="application/rss+xml" />\n'
+        '<language>bn</language>\n'
+        '<description>Every Bhoot FM episode — Bangladesh\'s longest-running '
+        'late-night Bangla horror radio show, hosted by RJ Russell on Radio '
+        'Foorti 88.0 FM. A non-commercial fan archive.</description>\n'
+        '<itunes:author>RJ Russell · Bhoot FM</itunes:author>\n'
+        '<itunes:owner><itunes:name>Bhoot FM Archive</itunes:name></itunes:owner>\n'
+        '<itunes:category text="Society &amp; Culture">'
+        '<itunes:category text="Documentary" /></itunes:category>\n'
+        '<itunes:category text="Fiction"><itunes:category text="Drama" /></itunes:category>\n'
+        '<itunes:explicit>false</itunes:explicit>\n'
+        f'<itunes:image href="{html.escape(cover)}" />\n'
+        f'<image><url>{html.escape(cover)}</url>'
+        '<title>Bhoot FM Archive</title>'
+        f'<link>{html.escape(site)}</link></image>\n'
+        + "\n".join(items_xml) +
+        "\n</channel>\n</rss>\n"
+    )
+    return Response(
+        content=body,
+        media_type="application/rss+xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=1800, s-maxage=3600"},
+    )
+
+
 @app.get("/sitemap.xml")
 def sitemap():
     base = PUBLIC_URL or ""
@@ -992,8 +1087,13 @@ log.info("asset version: %s", ASSET_VERSION)
 # Regex matches `src="app.js"` / `href="style.css"` etc. so we can splice the
 # version query in without parsing HTML. Same-origin paths only — leave CDN
 # URLs (Google Fonts, GoatCounter) alone since they don't share our cache.
+# Match an asset reference inside a src=/href= attribute, optionally followed
+# by an existing query string. We accept (and preserve) any pre-existing query
+# so URLs like `a.js?x=1` come out as `a.js?x=1&v=<ver>`.
 _ASSET_HREF_RE = re.compile(
-    r'((?:src|href)=")([^"#?]+\.(?:js|css|svg|png|webmanifest))(")'
+    r'((?:src|href)=")'
+    r'([^"#?]+\.(?:js|css|svg|png|webmanifest)(?:\?[^"#]*)?)'
+    r'(")'
 )
 
 
