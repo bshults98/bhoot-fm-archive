@@ -57,6 +57,13 @@
   const $railMostPlayed = document.getElementById("rail-mostplayed");
   const $railMostPlayedCards = document.getElementById("rail-mostplayed-cards");
   const $resetHistoryBtn = document.getElementById("reset-history-btn");
+  const $firstRun = document.getElementById("first-run");
+  const $firstRunDismiss = document.getElementById("first-run-dismiss");
+  const $filterPills = document.querySelectorAll(".filter-pill");
+  const $sortSelect = document.getElementById("sort-select");
+  const $expSleepStatus = document.getElementById("exp-sleep-status");
+  const $expSleepPills = document.querySelectorAll(".exp-ctrl-pill[data-sleep]");
+  const $expRatePills = document.querySelectorAll(".exp-ctrl-pill[data-rate]");
 
   // Clean up any leftover flag from the Webamp experiment.
   try { localStorage.removeItem("bfa_webamp"); } catch {}
@@ -68,14 +75,29 @@
     currentEpisode: null,
     currentSegments: [],
     allEpisodes: null,
+    browseFilter: "all",
+    browseSort: "newest",
   };
+  Object.assign(state, loadBrowsePrefs());
+
+  // Browse filter + sort (persisted on this device).
+  const BROWSE_PREFS_KEY = "bfa_browse_prefs_v1";
+  function loadBrowsePrefs() {
+    try {
+      const p = JSON.parse(localStorage.getItem(BROWSE_PREFS_KEY)) || {};
+      return { filter: p.filter || "all", sort: p.sort || "newest" };
+    } catch { return { filter: "all", sort: "newest" }; }
+  }
+  function saveBrowsePrefs() {
+    try { localStorage.setItem(BROWSE_PREFS_KEY, JSON.stringify({ filter: state.browseFilter, sort: state.browseSort })); } catch {}
+  }
 
   const SITE_NAME = "Bhoot FM Archive";
   const BASE_DESC = "Search and listen to Bengali horror radio episodes from Bhoot FM. Find ghost stories by keyword, jump to the exact moment.";
 
   // Rotating taglines — subtle and mood-setting, bilingual.
   const TAGLINES = [
-    "listen where you dare",
+    "search and listen where you dare",
     "রাতের গল্প · stories of the night",
     "broadcasts from beyond",
     "ভূত এফএম · since 2007",
@@ -542,6 +564,9 @@
 
     setStatus(`${eps.length} broadcasts unearthed`);
 
+    // ── First-run welcome (only for visitors with no listening history) ─
+    renderFirstRun();
+
     // ── Continue listening hero ──────────────────────────────────────
     renderHero(eps);
 
@@ -590,23 +615,146 @@
       $monthPills.innerHTML = "";
     }
 
-    // Episodes to show in the browse grid.
-    let showEps;
+    // Episodes to show in the browse grid (before filter/sort).
+    let baseEps;
     if (activeMonth) {
-      showEps = yearData[activeMonth].slice();
+      baseEps = yearData[activeMonth].slice();
     } else {
-      showEps = monthsInYear.flatMap(mo => yearData[mo]);
+      baseEps = monthsInYear.flatMap(mo => yearData[mo]);
     }
-    // Newest first within the selected range.
-    showEps.sort((a, b) => (b.air_date || "").localeCompare(a.air_date || ""));
 
-    const label = activeMonth
-      ? `${MONTH_NAMES[parseInt(activeMonth, 10) - 1]} ${activeYear} · ${showEps.length} episode${showEps.length === 1 ? "" : "s"}`
-      : `${activeYear} · ${showEps.length} episode${showEps.length === 1 ? "" : "s"}`;
-    $browseSub.textContent = label;
+    // Reflect persisted filter/sort in the controls.
+    syncBrowseControls();
+    renderBrowseGrid(baseEps, activeYear, activeMonth);
 
-    $browseGrid.innerHTML = showEps.map((ep, i) => cardHtml(ep, i)).join("");
+    // Year/month-aware SEO meta.
+    const yearLabel = activeMonth
+      ? `${MONTH_NAMES[parseInt(activeMonth, 10) - 1]} ${activeYear}`
+      : activeYear;
+    if (routeYear) {
+      setMeta({
+        title: `Bhoot FM episodes from ${yearLabel} — ${SITE_NAME}`,
+        description: `Browse and listen to every Bhoot FM episode aired in ${yearLabel}. ${BASE_DESC}`,
+      });
+    }
+  }
+
+  // Render only the grid — used both on initial home render and when the
+  // user changes the filter/sort controls (without nuking everything else).
+  function renderBrowseGrid(baseEps, activeYear, activeMonth) {
+    const filtered = applyBrowseFilterSort(baseEps);
+    const total = baseEps.length;
+    const showCount = filtered.length;
+    const yearLabel = activeMonth
+      ? `${MONTH_NAMES[parseInt(activeMonth, 10) - 1]} ${activeYear}`
+      : activeYear;
+    const filterSuffix = state.browseFilter === "all"
+      ? ""
+      : ` · ${showCount} of ${total} match "${filterLabel(state.browseFilter)}"`;
+    $browseSub.textContent = state.browseFilter === "all"
+      ? `${yearLabel} · ${total} episode${total === 1 ? "" : "s"}`
+      : `${yearLabel}${filterSuffix}`;
+    if (!filtered.length) {
+      $browseGrid.innerHTML = `<div class="empty-filter">No episodes match this filter in ${yearLabel}.</div>`;
+      return;
+    }
+    $browseGrid.innerHTML = filtered.map((ep, i) => cardHtml(ep, i)).join("");
     wireEpisodeCards($browseGrid);
+    // Stash for re-renders triggered by control changes.
+    state._browseBaseEps = baseEps;
+    state._browseYear = activeYear;
+    state._browseMonth = activeMonth;
+  }
+
+  function filterLabel(f) {
+    return f === "unplayed" ? "Unplayed"
+         : f === "in_progress" ? "In progress"
+         : f === "completed" ? "Played" : "All";
+  }
+
+  function applyBrowseFilterSort(eps) {
+    let out = eps.slice();
+    if (state.browseFilter !== "all") {
+      out = out.filter(ep => {
+        const st = historyStatus(ep.id);
+        if (state.browseFilter === "unplayed") return !st;
+        if (state.browseFilter === "in_progress") return st?.status === "in_progress";
+        if (state.browseFilter === "completed") return st?.status === "completed";
+        return true;
+      });
+    }
+    const cmpDateDesc = (a, b) => (b.air_date || "").localeCompare(a.air_date || "");
+    const cmpDateAsc  = (a, b) => (a.air_date || "").localeCompare(b.air_date || "");
+    const cmpDurDesc  = (a, b) => (b.duration_sec || 0) - (a.duration_sec || 0);
+    const cmpDurAsc   = (a, b) => (a.duration_sec || 0) - (b.duration_sec || 0);
+    if (state.browseSort === "oldest")        out.sort(cmpDateAsc);
+    else if (state.browseSort === "longest")  out.sort(cmpDurDesc);
+    else if (state.browseSort === "shortest") out.sort(cmpDurAsc);
+    else if (state.browseSort === "random") {
+      // Fisher–Yates.
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+    }
+    else                                       out.sort(cmpDateDesc);
+    return out;
+  }
+
+  function syncBrowseControls() {
+    $filterPills.forEach(p => {
+      const on = p.dataset.filter === state.browseFilter;
+      p.classList.toggle("active", on);
+      p.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    if ($sortSelect) $sortSelect.value = state.browseSort;
+  }
+
+  $filterPills.forEach(p => {
+    p.addEventListener("click", () => {
+      state.browseFilter = p.dataset.filter;
+      saveBrowsePrefs();
+      syncBrowseControls();
+      if (state._browseBaseEps) {
+        renderBrowseGrid(state._browseBaseEps, state._browseYear, state._browseMonth);
+      }
+    });
+  });
+  if ($sortSelect) {
+    $sortSelect.addEventListener("change", () => {
+      state.browseSort = $sortSelect.value;
+      saveBrowsePrefs();
+      if (state._browseBaseEps) {
+        renderBrowseGrid(state._browseBaseEps, state._browseYear, state._browseMonth);
+      }
+    });
+  }
+
+  // ── First-run welcome panel ───────────────────────────────────────────
+  const FIRST_RUN_DISMISSED_KEY = "bfa_first_run_dismissed_v1";
+  function renderFirstRun() {
+    if (!$firstRun) return;
+    let dismissed = false;
+    try { dismissed = !!localStorage.getItem(FIRST_RUN_DISMISSED_KEY); } catch {}
+    const hasHistory = Object.keys(historyLoad()).length > 0;
+    if (dismissed || hasHistory) { $firstRun.classList.add("hidden"); return; }
+    $firstRun.classList.remove("hidden");
+    // Wire example chips inside the panel (idempotent — clones avoid dupes).
+    $firstRun.querySelectorAll(".how-eg").forEach(btn => {
+      const clone = btn.cloneNode(true);
+      btn.replaceWith(clone);
+      clone.addEventListener("click", () => {
+        const q = clone.dataset.q || clone.textContent.trim();
+        $q.value = q;
+        location.hash = `#/q/${encodeURIComponent(q)}`;
+      });
+    });
+  }
+  if ($firstRunDismiss) {
+    $firstRunDismiss.addEventListener("click", () => {
+      try { localStorage.setItem(FIRST_RUN_DISMISSED_KEY, "1"); } catch {}
+      $firstRun.classList.add("hidden");
+    });
   }
 
   // ── Hero: continue listening ──────────────────────────────────────────
@@ -950,8 +1098,17 @@
   $prevBtn.addEventListener("click", () => skipEpisode(-1));
   $nextBtn.addEventListener("click", () => skipEpisode(+1));
 
-  // Auto-advance to next episode when one finishes.
-  $audio.addEventListener("ended", () => skipEpisode(+1));
+  // Auto-advance to next episode when one finishes — unless sleep timer
+  // asked us to stop at the end of the episode.
+  $audio.addEventListener("ended", () => {
+    if (sleepStopAtEnd) {
+      sleepStopAtEnd = false;
+      sleepClear();
+      whisperToast("☾ sleep · stopped at end of episode");
+      return;
+    }
+    skipEpisode(+1);
+  });
 
   // ─── Share a timestamp ───────────────────────────────────────────────
   async function shareTimestampLink(epId, atSec, btn) {
@@ -1106,6 +1263,104 @@
     else if (e.key === "ArrowLeft") { $audio.currentTime = Math.max(0, $audio.currentTime - step); e.preventDefault(); }
     else if (e.key === "Home") { $audio.currentTime = 0; e.preventDefault(); }
     else if (e.key === "End") { $audio.currentTime = $audio.duration; e.preventDefault(); }
+  });
+
+  // ─── Sleep timer ─────────────────────────────────────────────────────
+  // "Off" | "end" | minutes-as-number. "end" stops at end of current episode
+  // by disabling auto-advance for one ended event.
+  let sleepMode = "off";
+  let sleepDeadline = 0;        // ms timestamp when fixed-minute timer fires
+  let sleepTickInterval = null;
+  let sleepStopAtEnd = false;   // honoured by the "ended" handler below
+
+  function sleepRender() {
+    $expSleepPills.forEach(p => {
+      const v = p.dataset.sleep;
+      const on = (sleepMode === "off" && v === "0")
+              || (sleepMode === "end" && v === "end")
+              || (typeof sleepMode === "number" && String(sleepMode) === v);
+      p.classList.toggle("active", on);
+      p.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if (!$expSleepStatus) return;
+    if (sleepMode === "off") $expSleepStatus.textContent = "";
+    else if (sleepMode === "end") $expSleepStatus.textContent = "⏸ will stop at end of episode";
+    else if (typeof sleepMode === "number") {
+      const remainingMs = Math.max(0, sleepDeadline - Date.now());
+      const m = Math.floor(remainingMs / 60000);
+      const s = Math.floor((remainingMs % 60000) / 1000);
+      $expSleepStatus.textContent = `☾ sleeping in ${m}:${String(s).padStart(2, "0")}`;
+    }
+  }
+
+  function sleepClear() {
+    sleepMode = "off";
+    sleepStopAtEnd = false;
+    sleepDeadline = 0;
+    if (sleepTickInterval) { clearInterval(sleepTickInterval); sleepTickInterval = null; }
+    sleepRender();
+  }
+
+  function sleepSet(value) {
+    if (value === "0" || value === 0) { sleepClear(); return; }
+    if (value === "end") {
+      sleepMode = "end";
+      sleepStopAtEnd = true;
+      if (sleepTickInterval) { clearInterval(sleepTickInterval); sleepTickInterval = null; }
+      sleepRender();
+      whisperToast("sleep · stop at end of episode");
+      return;
+    }
+    const mins = parseInt(value, 10);
+    if (!mins || mins <= 0) { sleepClear(); return; }
+    sleepMode = mins;
+    sleepStopAtEnd = false;
+    sleepDeadline = Date.now() + mins * 60_000;
+    if (sleepTickInterval) clearInterval(sleepTickInterval);
+    sleepTickInterval = setInterval(() => {
+      const remaining = sleepDeadline - Date.now();
+      if (remaining <= 0) {
+        try { $audio.pause(); } catch {}
+        whisperToast("☾ sleep timer · paused");
+        sleepClear();
+        return;
+      }
+      sleepRender();
+    }, 1000);
+    sleepRender();
+    whisperToast(`sleep timer · ${mins} min`);
+  }
+
+  $expSleepPills.forEach(p => {
+    p.addEventListener("click", () => sleepSet(p.dataset.sleep));
+  });
+
+  // ─── Playback speed ──────────────────────────────────────────────────
+  const RATE_KEY = "bfa_playback_rate_v1";
+  function applyRate(r) {
+    const rate = parseFloat(r) || 1;
+    try { $audio.playbackRate = rate; } catch {}
+    try { localStorage.setItem(RATE_KEY, String(rate)); } catch {}
+    $expRatePills.forEach(p => {
+      const on = parseFloat(p.dataset.rate) === rate;
+      p.classList.toggle("active", on);
+      p.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+  // Restore saved rate.
+  try {
+    const saved = parseFloat(localStorage.getItem(RATE_KEY));
+    if (saved && saved > 0) applyRate(saved);
+  } catch {}
+  $expRatePills.forEach(p => {
+    p.addEventListener("click", () => applyRate(p.dataset.rate));
+  });
+  // Re-apply rate when a new source is loaded (browsers reset on load).
+  $audio.addEventListener("loadedmetadata", () => {
+    try {
+      const saved = parseFloat(localStorage.getItem(RATE_KEY)) || 1;
+      $audio.playbackRate = saved;
+    } catch {}
   });
 
   // ─── Easter eggs ─────────────────────────────────────────────────────

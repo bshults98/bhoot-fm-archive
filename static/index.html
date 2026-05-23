@@ -103,6 +103,7 @@
 </head>
 <body>
 
+<a class="skip-link" href="#q">Skip to search</a>
 <div id="drip-layer" aria-hidden="true"></div>
 
 <header role="banner">
@@ -112,12 +113,12 @@
       Bhoot FM <span class="accent">Archive</span>
     </h1>
     <p class="alt-name" lang="bn" aria-hidden="false">ভূত এফএম · আরজে রাসেল · রেডিও ফুর্তি</p>
-    <p class="tagline" id="rotating-tagline" aria-live="polite">listen where you dare</p>
+    <p class="tagline" id="rotating-tagline" aria-live="polite">search and listen where you dare</p>
   </div>
   <form class="search" id="search-form" autocomplete="off" role="search">
-    <input type="search" id="q" placeholder="whisper a word…" aria-label="Search" maxlength="120" />
-    <button type="button" id="random-btn" class="icon-btn" title="Random episode (R)" aria-label="Random episode">⚄</button>
-    <button type="submit" aria-label="Search">⌖ seek</button>
+    <input type="search" id="q" placeholder="Search in Bangla — try হাসপাতাল…" aria-label="Search episodes" maxlength="120" />
+    <button type="button" id="random-btn" class="icon-btn" title="Surprise me — play a random episode (R)" aria-label="Play a random episode">⚄</button>
+    <button type="submit" aria-label="Search episodes">⌖ search</button>
   </form>
   <p class="how-to" id="how-to" lang="en">
     Search inside every episode <strong>in Bangla</strong> —
@@ -139,6 +140,39 @@
   <section id="status" class="status" aria-live="polite"></section>
 
   <section id="home" class="home hidden" aria-label="Home">
+    <!-- First-run welcome (hidden once the user has any listening history, or after dismissal) -->
+    <div id="first-run" class="first-run hidden" aria-label="How this archive works">
+      <button class="first-run-dismiss" id="first-run-dismiss" type="button" aria-label="Dismiss welcome">✕</button>
+      <div class="first-run-label">𓁹 New here? Here's how it works</div>
+      <p class="first-run-lede">
+        Every Bhoot FM episode is on this page. The whole audio is searchable —
+        type a Bangla word and you'll see <em>exactly which episodes</em> say it,
+        and <em>when</em>.
+      </p>
+      <ol class="first-run-steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            Search for a word like
+            <button type="button" class="how-eg" data-q="হাসপাতাল">হাসপাতাল</button>
+            <span class="step-hint">(“hospital”)</span>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>You'll see every episode where it's spoken</div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            Tap a <span class="how-chip">⏱ 32:14</span> timestamp to start listening
+            from that exact moment
+          </div>
+        </li>
+      </ol>
+      <div class="first-run-or">— or just browse below —</div>
+    </div>
+
     <!-- Continue listening hero (only shown if there's an in-progress episode) -->
     <div id="hero-resume" class="hero hidden">
       <div class="hero-label">▶ Continue listening</div>
@@ -148,16 +182,16 @@
         <div class="hero-progress-fill" id="hero-progress-fill"></div>
       </div>
       <div class="hero-actions">
-        <button class="hero-btn primary" id="hero-resume-btn">▶ Resume <span id="hero-resume-time" class="hero-time"></span></button>
-        <button class="hero-btn ghost" id="hero-restart-btn">↺ Start over</button>
-        <button class="hero-btn ghost" id="hero-dismiss-btn" title="Mark as played">✓ Mark played</button>
+        <button class="hero-btn primary" id="hero-resume-btn" aria-label="Resume listening"><span aria-hidden="true">▶</span> Resume <span id="hero-resume-time" class="hero-time"></span></button>
+        <button class="hero-btn ghost" id="hero-restart-btn" aria-label="Start over from the beginning"><span aria-hidden="true">↺</span> Start over</button>
+        <button class="hero-btn ghost" id="hero-dismiss-btn" title="Mark as played" aria-label="Mark as played"><span aria-hidden="true">✓</span> Mark played</button>
       </div>
     </div>
 
     <!-- Tonight's pick + Recently played -->
     <div class="rails">
       <div class="rail" id="rail-tonight">
-        <div class="rail-label">𓁹 Tonight's pick <span class="rail-sub">— chosen for tonight only</span></div>
+        <div class="rail-label">𓁹 Tonight's Pick <span class="rail-sub">— a random episode, refreshed daily. Tap to play.</span></div>
         <div class="rail-cards" id="rail-tonight-cards"></div>
       </div>
       <div class="rail hidden" id="rail-recent">
@@ -178,6 +212,24 @@
       </div>
       <div class="years" id="year-pills" role="tablist" aria-label="Year"></div>
       <div class="months hidden" id="month-pills" role="tablist" aria-label="Month"></div>
+      <div class="browse-controls" role="group" aria-label="Filter and sort episodes">
+        <div class="filter-group" role="radiogroup" aria-label="Filter by listened status">
+          <button type="button" class="filter-pill active" data-filter="all" role="radio" aria-checked="true">All</button>
+          <button type="button" class="filter-pill" data-filter="unplayed" role="radio" aria-checked="false">Unplayed</button>
+          <button type="button" class="filter-pill" data-filter="in_progress" role="radio" aria-checked="false">In progress</button>
+          <button type="button" class="filter-pill" data-filter="completed" role="radio" aria-checked="false">Played</button>
+        </div>
+        <div class="sort-group">
+          <label for="sort-select" class="sort-label">Sort</label>
+          <select id="sort-select" class="sort-select" aria-label="Sort episodes">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="longest">Longest first</option>
+            <option value="shortest">Shortest first</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+      </div>
       <div class="browse-grid" id="browse-grid"></div>
     </div>
   </section>
@@ -227,7 +279,9 @@
       &nbsp;·&nbsp; <button type="button" class="about-link reset-history-btn" id="reset-history-btn" title="Clear listening history on this device">reset listening history</button>
     </p>
     <p class="device-note">
-      Your listening history is saved on <em>this device only</em>. No account, no server-side tracking.
+      <span class="device-note-icon" aria-hidden="true">⛨</span>
+      <strong>Privacy:</strong> your listening history is saved on
+      <em>this device only</em>. No accounts, no server-side tracking of who listened to what.
     </p>
   </section>
 </main>
@@ -244,6 +298,24 @@
     <p class="exp-now-playing" aria-label="Now playing">▶ now playing</p>
     <div class="exp-ep-title" id="exp-ep-title">—</div>
     <div class="exp-ep-meta" id="exp-ep-meta"></div>
+    <div class="exp-controls" aria-label="Playback options">
+      <div class="exp-ctrl-group" role="group" aria-label="Sleep timer">
+        <span class="exp-ctrl-label">☾ Sleep</span>
+        <button type="button" class="exp-ctrl-pill active" data-sleep="0" aria-pressed="true">Off</button>
+        <button type="button" class="exp-ctrl-pill" data-sleep="15" aria-pressed="false">15m</button>
+        <button type="button" class="exp-ctrl-pill" data-sleep="30" aria-pressed="false">30m</button>
+        <button type="button" class="exp-ctrl-pill" data-sleep="60" aria-pressed="false">60m</button>
+        <button type="button" class="exp-ctrl-pill" data-sleep="end" aria-pressed="false" title="Stop at end of episode">End of ep</button>
+      </div>
+      <div class="exp-ctrl-group" role="group" aria-label="Playback speed">
+        <span class="exp-ctrl-label">⌁ Speed</span>
+        <button type="button" class="exp-ctrl-pill" data-rate="0.8" aria-pressed="false">0.8×</button>
+        <button type="button" class="exp-ctrl-pill active" data-rate="1" aria-pressed="true">1×</button>
+        <button type="button" class="exp-ctrl-pill" data-rate="1.25" aria-pressed="false">1.25×</button>
+        <button type="button" class="exp-ctrl-pill" data-rate="1.5" aria-pressed="false">1.5×</button>
+      </div>
+      <div class="exp-sleep-status" id="exp-sleep-status" aria-live="polite"></div>
+    </div>
   </div>
 </div>
 

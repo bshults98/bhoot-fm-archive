@@ -942,6 +942,91 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
 /* ─── Home view ─────────────────────────────────────────────────── */
 .home { display: flex; flex-direction: column; gap: 28px; }
 
+/* First-run welcome — shown to visitors with no listening history. */
+.first-run {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(185, 28, 28, 0.10) 0%, rgba(20, 8, 16, 0.85) 60%, rgba(7, 7, 11, 0.92) 100%),
+    var(--bg-elev);
+  border: 1px solid rgba(185, 28, 28, 0.30);
+  border-radius: 8px;
+  padding: 22px 26px 20px;
+  box-shadow: 0 0 30px -12px var(--blood-glow);
+}
+.first-run-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--blood-soft);
+  margin-bottom: 10px;
+}
+.first-run-lede {
+  margin: 0 0 16px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  letter-spacing: 0.4px;
+  max-width: 640px;
+}
+.first-run-lede em { color: var(--blood-soft); font-style: italic; }
+.first-run-steps {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.first-run-steps li {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.first-run-steps .step-num {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--blood);
+  color: var(--blood-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Special Elite', monospace;
+  font-size: 12px;
+  background: rgba(185, 28, 28, 0.10);
+}
+.first-run-steps .step-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-style: italic;
+  margin-left: 4px;
+}
+.first-run-or {
+  margin-top: 14px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  text-align: center;
+  opacity: 0.7;
+}
+.first-run-dismiss {
+  position: absolute; top: 8px; right: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-faint);
+  font-size: 14px;
+  width: 28px; height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.first-run-dismiss:hover { color: var(--blood-soft); border-color: var(--border); }
+@media (max-width: 520px) {
+  .first-run { padding: 18px 18px 16px; }
+  .first-run-lede { font-size: 13px; }
+  .first-run-steps li { font-size: 13px; }
+}
+
 /* Continue-listening hero */
 .hero {
   background: linear-gradient(135deg, rgba(185, 28, 28, 0.14) 0%, rgba(20, 8, 16, 0.85) 60%, rgba(7, 7, 11, 0.92) 100%);
@@ -1228,6 +1313,192 @@ button.about-link.reset-history-btn:hover {
   margin-top: 6px;
 }
 .device-note em { color: var(--text-dim); font-style: normal; }
+.device-note strong {
+  color: var(--blood-soft);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-size: 10px;
+  margin-right: 4px;
+}
+.device-note-icon {
+  color: var(--blood-soft);
+  margin-right: 4px;
+  opacity: 0.8;
+}
+
+/* ── Skip-to-search link (visually hidden until focused) ───────────── */
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: -50px;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: var(--blood);
+  color: var(--bone);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+  box-shadow: 0 0 18px -4px var(--blood-glow);
+}
+.skip-link:focus {
+  top: 10px;
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+/* ── Browse filter + sort controls ────────────────────────────────── */
+.browse-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: 6px;
+}
+.filter-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.filter-pill {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  min-height: 32px;
+}
+.filter-pill:hover { color: var(--blood-soft); border-color: var(--blood); }
+.filter-pill:focus-visible { outline: 2px solid var(--blood-soft); outline-offset: 2px; }
+.filter-pill.active {
+  background: var(--blood);
+  color: var(--bone);
+  border-color: var(--blood);
+  box-shadow: 0 0 12px -4px var(--blood-glow);
+}
+.sort-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sort-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.sort-select {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 7px 28px 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 32px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-faint) 50%),
+                    linear-gradient(135deg, var(--text-faint) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.sort-select:hover { color: var(--blood-soft); border-color: var(--blood); }
+.sort-select:focus-visible { outline: 2px solid var(--blood-soft); outline-offset: 2px; }
+.empty-filter {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  padding: 30px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+/* ── Expanded player: sleep timer + playback speed ────────────────── */
+.exp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 28px;
+  width: 100%;
+  max-width: 520px;
+}
+.exp-ctrl-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.exp-ctrl-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--blood-soft);
+  opacity: 0.75;
+  margin-right: 6px;
+  min-width: 60px;
+  text-align: right;
+}
+.exp-ctrl-pill {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 30px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.exp-ctrl-pill:hover { color: var(--blood-soft); border-color: var(--blood); }
+.exp-ctrl-pill:focus-visible { outline: 2px solid var(--blood-soft); outline-offset: 2px; }
+.exp-ctrl-pill.active {
+  background: var(--blood);
+  color: var(--bone);
+  border-color: var(--blood);
+  box-shadow: 0 0 12px -4px var(--blood-glow);
+}
+.exp-sleep-status {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--blood-soft);
+  text-align: center;
+  min-height: 16px;
+  opacity: 0.85;
+}
+@media (max-width: 700px) {
+  .exp-ctrl-label { min-width: auto; text-align: center; flex-basis: 100%; margin-right: 0; margin-bottom: 2px; }
+  .browse-controls { flex-direction: column; align-items: stretch; }
+  .sort-group { justify-content: flex-end; }
+}
 
 /* Mobile tweaks for the new home view */
 @media (max-width: 700px) {
