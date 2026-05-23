@@ -749,10 +749,9 @@
     const filterSuffix = state.browseFilter === "all"
       ? ""
       : ` · ${showCount} of ${total} match "${filterLabel(state.browseFilter)}"`;
-    const baseLabel = state.browseFilter === "all"
+    $browseSub.textContent = state.browseFilter === "all"
       ? `${yearLabel} · ${total} episode${total === 1 ? "" : "s"}`
       : `${yearLabel}${filterSuffix}`;
-    $browseSub.innerHTML = `${escapeHtml(baseLabel)} · <a class="browse-permalink" href="/episodes/${encodeURIComponent(activeYear)}">permalink</a>`;
     if (!filtered.length) {
       $browseGrid.innerHTML = `<div class="empty-filter">No episodes match this filter in ${yearLabel}.</div>`;
       return;

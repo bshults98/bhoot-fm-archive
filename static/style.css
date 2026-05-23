@@ -1892,18 +1892,6 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
 .seo-footer a { color: var(--text-faint); border-bottom: 1px dotted var(--text-faint); text-decoration: none; }
 .seo-footer a:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
 
-.browse-permalink {
-  color: var(--text-faint);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--text-faint);
-  font-family: 'Special Elite', monospace;
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-left: 2px;
-}
-.browse-permalink:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
-
 .retry-btn {
   margin-top: 16px;
   background: var(--blood);
