@@ -1721,3 +1721,222 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
   margin-left: 4px;
 }
 .about-link:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+
+/* ─── SEO landing pages (/episodes/{year}, /episode/{id}) ─────────── */
+.seo-page { padding: 0 20px 60px; }
+.seo-header {
+  display: flex; align-items: center;
+  padding: 24px 0 18px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 28px;
+}
+.seo-home-link {
+  display: flex; align-items: center; gap: 12px;
+  text-decoration: none; color: var(--bone);
+  font-family: 'Creepster', 'Noto Sans Bengali', serif;
+  font-size: 22px; letter-spacing: 2px;
+}
+.seo-home-link .logo { font-size: 28px; color: var(--blood-soft); }
+.seo-home-link .accent { color: var(--blood-soft); }
+.seo-main { max-width: 880px; margin: 0 auto; }
+.seo-breadcrumb {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px; letter-spacing: 1.5px;
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+.seo-breadcrumb a { color: var(--text-dim); text-decoration: none; border-bottom: 1px dotted var(--text-faint); }
+.seo-breadcrumb a:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+.seo-h1 {
+  font-family: 'Creepster', 'Noto Sans Bengali', serif;
+  font-size: clamp(28px, 4vw, 40px);
+  color: var(--bone);
+  letter-spacing: 2px;
+  margin: 4px 0 14px;
+  text-shadow: 0 0 18px rgba(185, 28, 28, 0.25);
+}
+.seo-lede {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--text-dim);
+  font-size: 15px; line-height: 1.6;
+  max-width: 64ch;
+  margin-bottom: 20px;
+}
+.seo-year-nav {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 13px; letter-spacing: 1px;
+  color: var(--text-faint);
+  margin-bottom: 28px;
+  line-height: 2.2;
+}
+.seo-year-nav a { color: var(--text-dim); text-decoration: none; border-bottom: 1px dotted var(--text-faint); padding: 2px 4px; }
+.seo-year-nav a:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+.seo-year-nav strong { color: var(--blood-soft); padding: 2px 4px; }
+.seo-month {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--blood-soft);
+  margin: 28px 0 8px;
+}
+.seo-ep-list { list-style: none; padding: 0; margin: 0 0 20px; }
+.seo-ep-row {
+  border-bottom: 1px solid var(--border-soft);
+  padding: 10px 0;
+  display: flex; align-items: baseline; gap: 10px;
+  flex-wrap: wrap;
+}
+.seo-ep-link {
+  display: flex; align-items: baseline; gap: 14px; flex: 1 1 auto;
+  text-decoration: none; color: var(--bone);
+  min-width: 0;
+}
+.seo-ep-date {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  color: var(--text-faint); font-size: 13px;
+  letter-spacing: 1.2px; white-space: nowrap;
+}
+.seo-ep-title {
+  color: var(--bone); font-size: 15px;
+  border-bottom: 1px dotted transparent;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.seo-ep-link:hover .seo-ep-title { color: var(--blood-soft); border-bottom-color: var(--blood); }
+.seo-ep-dur {
+  font-family: 'Special Elite', monospace;
+  color: var(--text-faint); font-size: 12px; letter-spacing: 1px;
+}
+.seo-cta { text-align: center; margin: 30px 0; }
+.seo-cta-link {
+  display: inline-block;
+  background: var(--blood);
+  color: var(--bone);
+  border: 1px solid #6b1010;
+  padding: 12px 26px;
+  border-radius: 4px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.seo-cta-link:hover { background: #d62525; box-shadow: 0 0 18px rgba(255, 50, 50, 0.5); }
+
+/* Episode detail page */
+.seo-episode-kicker {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  color: var(--blood-soft);
+  font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.seo-episode-title { margin-bottom: 18px; }
+.seo-episode-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--blood);
+  border-radius: 4px;
+}
+.seo-episode-meta div { display: flex; flex-direction: column; gap: 2px; }
+.seo-episode-meta dt {
+  font-family: 'Special Elite', monospace;
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-faint);
+}
+.seo-episode-meta dd {
+  margin: 0;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--bone); font-size: 14px;
+}
+.seo-episode-desc {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--text-dim); font-size: 15px; line-height: 1.6;
+  margin-bottom: 24px;
+}
+.seo-adj-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 18px; margin-top: 24px;
+}
+.seo-adj {
+  font-family: 'Special Elite', monospace;
+  font-size: 12px; letter-spacing: 1.5px;
+  color: var(--text-dim); text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+  padding-bottom: 2px;
+}
+.seo-adj:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+.seo-adj-disabled { color: var(--text-faint); opacity: 0.5; border-bottom: 1px dotted transparent; }
+.seo-adj-up {
+  font-family: 'Special Elite', monospace;
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-faint); text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+}
+.seo-adj-up:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+.seo-footer {
+  margin: 60px auto 0;
+  max-width: 880px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-soft);
+  font-family: 'Special Elite', monospace;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: var(--text-faint);
+  text-align: center;
+}
+.seo-footer a { color: var(--text-faint); border-bottom: 1px dotted var(--text-faint); text-decoration: none; }
+.seo-footer a:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+
+.browse-permalink {
+  color: var(--text-faint);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+  font-family: 'Special Elite', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+.browse-permalink:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
+
+.retry-btn {
+  margin-top: 16px;
+  background: var(--blood);
+  color: var(--bone);
+  border: 1px solid #6b1010;
+  padding: 10px 22px;
+  border-radius: 4px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.retry-btn:hover { background: #d62525; box-shadow: 0 0 14px rgba(255, 50, 50, 0.5); }
+
+/* Banglish → Bangla transliteration notice */
+.translit-notice {
+  background: rgba(185, 28, 28, 0.08);
+  border: 1px solid rgba(185, 28, 28, 0.22);
+  border-left: 3px solid var(--blood);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.translit-notice strong { color: var(--bone); font-weight: 500; }
+.translit-from {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-left: 6px;
+}
+.translit-from em { color: var(--text-dim); font-style: italic; }

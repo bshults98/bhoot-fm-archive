@@ -108,16 +108,45 @@
   ];
 
   // ─── Helpers ─────────────────────────────────────────────────────────
-  const api = (path, params) => {
+  // Fly free-tier machines auto-stop after idle, so the *first* request can
+  // wait several seconds while the box boots. Same story for any cold-start
+  // backend (HF Spaces etc.). Retry transient failures with backoff so a sleepy
+  // server doesn't look like a broken one to the user.
+  const API_RETRY_DELAYS_MS = [600, 1800, 4500];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function api(path, params, opts = {}) {
     const url = new URL(path, location.origin);
     if (params)
       for (const [k, v] of Object.entries(params))
         if (v != null && v !== "") url.searchParams.set(k, v);
-    return fetch(url).then(r => {
-      if (!r.ok) throw new Error(`request failed`);
-      return r.json();
-    });
-  };
+    const { retries = API_RETRY_DELAYS_MS.length, onRetry } = opts;
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const r = await fetch(url);
+        if (r.ok) return await r.json();
+        // 429 = real rate limit, surface immediately; client should slow down.
+        // 4xx other than 429 = our request is wrong, no point retrying.
+        if (r.status === 429 || (r.status >= 400 && r.status < 500)) {
+          const err = new Error(`request failed`);
+          err.status = r.status;
+          throw err;
+        }
+        lastErr = new Error(`request failed (${r.status})`);
+        lastErr.status = r.status;
+      } catch (e) {
+        // Network errors / aborts retry; explicit 4xx throws don't.
+        if (e.status && e.status < 500) throw e;
+        lastErr = e;
+      }
+      if (attempt >= retries) break;
+      const delay = API_RETRY_DELAYS_MS[Math.min(attempt, API_RETRY_DELAYS_MS.length - 1)];
+      if (onRetry) onRetry(attempt + 1, retries + 1);
+      await sleep(delay);
+    }
+    throw lastErr || new Error("request failed");
+  }
 
   const fmtTs = sec => {
     sec = Math.max(0, Math.floor(sec));
@@ -325,6 +354,58 @@
       $audio.currentTime = startSec;
       $audio.play().catch(() => {});
     }
+    updateMediaSession(episode);
+  }
+
+  // ── Media Session API: lock-screen / dynamic-island / hardware-key UI ─
+  // Exposes the current episode's title + artwork to the OS media controls so
+  // listeners can play/pause/seek without opening the tab. Silently noops if
+  // the browser doesn't implement it (older Safari, some embedded views).
+  function updateMediaSession(episode) {
+    if (!("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: episode.title || "Bhoot FM",
+        artist: "RJ Russell · Bhoot FM",
+        album: `Radio Foorti 88.0 FM · ${fmtDate(episode.air_date)}`,
+        artwork: [
+          { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+          { src: "/og-image.png",         sizes: "1200x630", type: "image/png" },
+          { src: "/favicon.svg",          sizes: "any",      type: "image/svg+xml" },
+        ],
+      });
+    } catch {}
+    if (!navigator.mediaSession._bfaWired) {
+      const setHandler = (action, fn) => {
+        try { navigator.mediaSession.setActionHandler(action, fn); } catch {}
+      };
+      setHandler("play",            () => { $audio.play().catch(() => {}); });
+      setHandler("pause",           () => { $audio.pause(); });
+      setHandler("seekbackward",    e => { $audio.currentTime = Math.max(0, $audio.currentTime - (e?.seekOffset || 15)); });
+      setHandler("seekforward",     e => { $audio.currentTime = Math.min($audio.duration || 0, $audio.currentTime + (e?.seekOffset || 30)); });
+      setHandler("seekto",          e => {
+        if (e?.fastSeek && "fastSeek" in $audio) { $audio.fastSeek(e.seekTime); return; }
+        if (e?.seekTime != null) $audio.currentTime = e.seekTime;
+      });
+      setHandler("previoustrack",   () => { if (!$prevBtn.disabled) $prevBtn.click(); });
+      setHandler("nexttrack",       () => { if (!$nextBtn.disabled) $nextBtn.click(); });
+      navigator.mediaSession._bfaWired = true;
+    }
+  }
+
+  // Keep the OS scrubber and play-state in sync with the actual audio element.
+  function updateMediaSessionState() {
+    if (!("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = $audio.paused ? "paused" : "playing";
+      if ("setPositionState" in navigator.mediaSession && $audio.duration && isFinite($audio.duration)) {
+        navigator.mediaSession.setPositionState({
+          duration: $audio.duration,
+          playbackRate: $audio.playbackRate || 1,
+          position: Math.min($audio.currentTime || 0, $audio.duration),
+        });
+      }
+    } catch {}
   }
   // ─── Audio-reactive visualizer ───────────────────────────────────────
   let audioCtx = null;
@@ -538,9 +619,9 @@
 
   const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  async function ensureAllEpisodes() {
+  async function ensureAllEpisodes(onRetry) {
     if (state.allEpisodes) return state.allEpisodes;
-    const data = await api("/api/episodes");
+    const data = await api("/api/episodes", null, { onRetry });
     state.allEpisodes = data.episodes;
     state.yearIndex = buildYearIndex(data.episodes);
     return state.allEpisodes;
@@ -553,8 +634,25 @@
     setStatus("Listening for whispers…", "loading");
 
     let eps;
-    try { eps = await ensureAllEpisodes(); }
-    catch { setStatus("Could not reach the archive.", "error"); return; }
+    try {
+      eps = await ensureAllEpisodes((n, total) => {
+        setStatus(`The archive is waking up… (attempt ${n}/${total})`, "loading");
+      });
+    } catch {
+      setStatus("");
+      $browseGrid.innerHTML = `
+        <div class="empty">
+          <h2>Could not reach the archive</h2>
+          <div>The server may be cold-starting or briefly unreachable. Try again in a moment.</div>
+          <button type="button" class="retry-btn" id="home-retry-btn">↻ Retry</button>
+        </div>`;
+      const btn = document.getElementById("home-retry-btn");
+      if (btn) btn.addEventListener("click", () => {
+        state.allEpisodes = null;
+        renderHome(routeYear, routeMonth);
+      });
+      return;
+    }
     if (!eps.length) {
       setStatus("");
       $browseGrid.innerHTML =
@@ -651,9 +749,10 @@
     const filterSuffix = state.browseFilter === "all"
       ? ""
       : ` · ${showCount} of ${total} match "${filterLabel(state.browseFilter)}"`;
-    $browseSub.textContent = state.browseFilter === "all"
+    const baseLabel = state.browseFilter === "all"
       ? `${yearLabel} · ${total} episode${total === 1 ? "" : "s"}`
       : `${yearLabel}${filterSuffix}`;
+    $browseSub.innerHTML = `${escapeHtml(baseLabel)} · <a class="browse-permalink" href="/episodes/${encodeURIComponent(activeYear)}">permalink</a>`;
     if (!filtered.length) {
       $browseGrid.innerHTML = `<div class="empty-filter">No episodes match this filter in ${yearLabel}.</div>`;
       return;
@@ -935,17 +1034,25 @@
       description: `Search results for "${q}" in the Bhoot FM Archive.`,
     });
     setStatus("Searching the static…", "loading");
+
+    // Banglish → Bangla fallback. If the user typed in Latin (e.g. "hospital",
+    // "ambulance"), transliterate to Bangla and search the converted query.
+    // Transcripts are pure Bangla, so the original Latin form would otherwise
+    // hit zero — this is the difference between "no results" and useful hits.
+    const tr = (typeof banglishToBangla === "function")
+      ? banglishToBangla(q)
+      : { bangla: q, original: q, transformed: false };
+    const effectiveQ = tr.transformed ? tr.bangla : q;
     try {
-      const data = await api("/api/search", { q, limit: 200 });
+      const data = await api("/api/search", { q: effectiveQ, limit: 200 });
       if (data.total === 0) {
-        // If the query is all Latin (no Bengali codepoints), the user
-        // probably typed in English — gently steer them to Bangla, since
-        // the transcripts are all in Bangla.
         const hasBangla = /[ঀ-৿]/.test(q);
         const hint = hasBangla
           ? ""
           : `<div class="empty-hint">
-               Transcripts are in <strong>Bangla</strong>. Try a Bangla word —
+               Transcripts are in <strong>Bangla</strong>. ${tr.transformed
+                 ? `We searched for <strong lang="bn">${escapeHtml(tr.bangla)}</strong> and still found nothing — try a different Bangla word.`
+                 : `Try a Bangla word —`}
                <button type="button" class="how-eg" data-q="অ্যাম্বুলেন্স">অ্যাম্বুলেন্স</button>
                <button type="button" class="how-eg" data-q="হাসপাতাল">হাসপাতাল</button>
                <button type="button" class="how-eg" data-q="বাড়ি">বাড়ি</button>
@@ -981,7 +1088,13 @@
       setStatus(
         `${data.total} echo${data.total > 1 ? "es" : ""} across ${byEpisode.size} broadcast${byEpisode.size > 1 ? "s" : ""}`
       );
-      $results.innerHTML = [...byEpisode.values()].map((ep, i) => `
+      const translitNotice = tr.transformed
+        ? `<div class="translit-notice">
+             Showing results for <strong lang="bn">${escapeHtml(tr.bangla)}</strong>
+             <span class="translit-from">— transliterated from <em>${escapeHtml(tr.original)}</em></span>
+           </div>`
+        : "";
+      $results.innerHTML = translitNotice + [...byEpisode.values()].map((ep, i) => `
         <div class="card card-appear" data-ep-id="${ep.episode_id}" style="animation-delay: ${Math.min(i, 20) * 22}ms">
           <div class="card-head">
             <div>
@@ -1259,11 +1372,12 @@
     if ($audio.paused) $audio.play().catch(() => {});
     else $audio.pause();
   });
-  $audio.addEventListener("play", () => setPlayingUI(true));
-  $audio.addEventListener("pause", () => setPlayingUI(false));
-  $audio.addEventListener("ended", () => setPlayingUI(false));
-  $audio.addEventListener("loadedmetadata", updateScrubber);
-  $audio.addEventListener("durationchange", updateScrubber);
+  $audio.addEventListener("play", () => { setPlayingUI(true); updateMediaSessionState(); });
+  $audio.addEventListener("pause", () => { setPlayingUI(false); updateMediaSessionState(); });
+  $audio.addEventListener("ended", () => { setPlayingUI(false); updateMediaSessionState(); });
+  $audio.addEventListener("loadedmetadata", () => { updateScrubber(); updateMediaSessionState(); });
+  $audio.addEventListener("durationchange", () => { updateScrubber(); updateMediaSessionState(); });
+  $audio.addEventListener("ratechange", updateMediaSessionState);
   $audio.addEventListener("progress", updateBuffer);
   // Scrubber updates 4×/sec — plenty for the visual, far cheaper than
   // RAF (60fps) for what's just a width change. setInterval is paused

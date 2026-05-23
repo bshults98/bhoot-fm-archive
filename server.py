@@ -11,6 +11,8 @@ SEO:
   - /robots.txt allows all
 """
 
+import html
+import json
 import logging
 import mimetypes
 import os
@@ -170,7 +172,9 @@ app.add_middleware(
 # ─── Security headers middleware ────────────────────────────────────
 CSP = (
     "default-src 'self'; "
-    "img-src 'self' data:; "
+    # GoatCounter falls back to an <img> pixel when sendBeacon/fetch is blocked,
+    # so its hit endpoint needs to be reachable via img-src too.
+    "img-src 'self' data: https://*.goatcounter.com; "
     # Allow audio from our origin, the IA CDN (the final home), and the
     # legacy bhoot-fm.com mirror used as fallback during transition.
     "media-src 'self' "
@@ -178,9 +182,11 @@ CSP = (
     "http://dl.bhoot-fm.com https://dl.bhoot-fm.com blob:; "
     "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
     "font-src 'self' https://fonts.gstatic.com data:; "
-    # gc.zgo.at is GoatCounter's analytics script (privacy-friendly, no cookies).
+    # gc.zgo.at serves the loader script; bhootfm.goatcounter.com is where the
+    # actual hit beacon is POSTed (the data-goatcounter URL on the <script>).
+    # Both must be allowed or visits silently never register.
     "script-src 'self' https://gc.zgo.at; "
-    "connect-src 'self' https://gc.zgo.at; "
+    "connect-src 'self' https://gc.zgo.at https://*.goatcounter.com; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "
     "form-action 'self'"
@@ -628,18 +634,22 @@ def sitemap():
     base = PUBLIC_URL or ""
     with get_db() as db:
         episodes = db.execute(
-            "SELECT id, air_date FROM episodes "
-            "WHERE transcript_status = 'done' "
-            "ORDER BY air_date DESC"
+            "SELECT id, air_date FROM episodes ORDER BY air_date DESC"
         ).fetchall()
+    years = sorted({r["air_date"][:4] for r in episodes if r["air_date"]}, reverse=True)
     urls = [
         f"<url><loc>{base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>"
     ]
+    for y in years:
+        urls.append(
+            f"<url><loc>{base}/episodes/{y}</loc>"
+            f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        )
     for r in episodes:
         urls.append(
-            f"<url><loc>{base}/#/ep/{r['id']}</loc>"
+            f"<url><loc>{base}/episode/{r['id']}</loc>"
             f"<lastmod>{r['air_date']}</lastmod>"
-            f"<changefreq>yearly</changefreq><priority>0.7</priority></url>"
+            f"<changefreq>yearly</changefreq><priority>0.6</priority></url>"
         )
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -650,9 +660,391 @@ def sitemap():
     return Response(content=body, media_type="application/xml")
 
 
-# Static files — mounted last so /api/* and /sitemap.xml win.
+# ─── SEO landing pages ──────────────────────────────────────────────
+# Real, crawlable HTML for each year and each episode. Click-through into
+# the SPA player happens via a normal anchor to /#/ep/{id}, so we don't
+# need any inline script (which CSP would block anyway).
+
+_MONTH_NAMES_EN = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+_YEAR_RE = re.compile(r"^\d{4}$")
+
+
+def _fmt_duration(sec: Optional[int]) -> str:
+    if not sec:
+        return ""
+    sec = int(sec)
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m"
+    return f"{m}m {s:02d}s"
+
+
+def _fmt_iso_duration(sec: Optional[int]) -> str:
+    if not sec:
+        return ""
+    sec = int(sec)
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    out = "PT"
+    if h:
+        out += f"{h}H"
+    if m:
+        out += f"{m}M"
+    if s or not (h or m):
+        out += f"{s}S"
+    return out
+
+
+def _page_shell(title: str, description: str, canonical_path: str,
+                body: str, jsonld: list) -> str:
+    base = PUBLIC_URL or ""
+    canonical = f"{base}{canonical_path}" if base else canonical_path
+    jsonld_blocks = "\n".join(
+        f'<script type="application/ld+json">{json.dumps(obj, ensure_ascii=False)}</script>'
+        for obj in jsonld
+    )
+    return f"""<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#07070b" />
+<title>{html.escape(title)}</title>
+<meta name="description" content="{html.escape(description)}" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<link rel="canonical" href="{html.escape(canonical)}" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Bhoot FM Archive" />
+<meta property="og:url" content="{html.escape(canonical)}" />
+<meta property="og:title" content="{html.escape(title)}" />
+<meta property="og:description" content="{html.escape(description)}" />
+<meta property="og:image" content="{html.escape((PUBLIC_URL or '') + '/og-image.png')}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Bhoot FM Archive — a one-eyed ghost beside the wordmark, on a dark backdrop." />
+<meta property="og:locale" content="bn_BD" />
+<meta property="og:locale:alternate" content="en_US" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{html.escape(title)}" />
+<meta name="twitter:description" content="{html.escape(description)}" />
+<meta name="twitter:image" content="{html.escape((PUBLIC_URL or '') + '/og-image.png')}" />
+<meta name="twitter:image:alt" content="Bhoot FM Archive — dark horror radio archive." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Special+Elite&family=Noto+Sans+Bengali:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+{jsonld_blocks}
+</head>
+<body class="seo-page">
+<header role="banner" class="seo-header">
+  <a href="/" class="seo-home-link">
+    <span class="logo" aria-hidden="true">𓁹</span>
+    <span class="seo-brand">Bhoot FM <span class="accent">Archive</span></span>
+  </a>
+</header>
+<main id="main" role="main" class="seo-main">
+{body}
+</main>
+<footer class="seo-footer">
+  <p>© 2026 · A non-commercial fan project. Audio belongs to Radio Foorti and the Bhoot FM team.
+  <a href="/about.html">about &amp; takedown</a></p>
+</footer>
+</body>
+</html>
+"""
+
+
+@app.get("/episodes/{year}")
+def episodes_by_year(year: str):
+    if not _YEAR_RE.match(year):
+        raise HTTPException(404, "Not found")
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, air_date, title, duration_sec, transcript_status "
+            "FROM episodes "
+            "WHERE substr(air_date, 1, 4) = ? "
+            "ORDER BY air_date DESC",
+            (year,),
+        ).fetchall()
+    if not rows:
+        raise HTTPException(404, "Not found")
+
+    # Year navigation across the archive.
+    with get_db() as db:
+        all_years = [r["y"] for r in db.execute(
+            "SELECT DISTINCT substr(air_date, 1, 4) AS y FROM episodes "
+            "WHERE air_date IS NOT NULL ORDER BY y DESC"
+        ).fetchall()]
+
+    # Group by month for readable listings.
+    by_month: dict[str, list] = {}
+    for r in rows:
+        mo = (r["air_date"] or "")[5:7] or "??"
+        by_month.setdefault(mo, []).append(r)
+
+    items_html_parts = []
+    for mo in sorted(by_month.keys(), reverse=True):
+        mo_label = _MONTH_NAMES_EN[int(mo) - 1] if mo.isdigit() and 1 <= int(mo) <= 12 else mo
+        items_html_parts.append(f'<h2 class="seo-month">{html.escape(mo_label)} {html.escape(year)}</h2>')
+        items_html_parts.append('<ul class="seo-ep-list">')
+        for r in by_month[mo]:
+            dur = _fmt_duration(r["duration_sec"])
+            dur_html = f' <span class="seo-ep-dur">· {html.escape(dur)}</span>' if dur else ""
+            items_html_parts.append(
+                f'<li class="seo-ep-row">'
+                f'<a href="/episode/{html.escape(r["id"])}" class="seo-ep-link">'
+                f'<span class="seo-ep-date">{html.escape(r["air_date"] or "")}</span>'
+                f'<span class="seo-ep-title">{html.escape(r["title"] or "")}</span>'
+                f'</a>{dur_html}'
+                f'</li>'
+            )
+        items_html_parts.append("</ul>")
+    items_html = "\n".join(items_html_parts)
+
+    year_nav = " · ".join(
+        (f'<strong>{y}</strong>' if y == year
+         else f'<a href="/episodes/{y}">{y}</a>')
+        for y in all_years
+    )
+
+    body = f"""
+<nav class="seo-breadcrumb"><a href="/">Home</a> / <span>Episodes from {html.escape(year)}</span></nav>
+<h1 class="seo-h1">Bhoot FM episodes from {html.escape(year)}</h1>
+<p class="seo-lede">
+  {len(rows)} episode{'' if len(rows) == 1 else 's'} of <strong>Bhoot FM</strong>
+  (<span lang="bn">ভূত এফএম</span>) — RJ Russell's late-night Bangla horror radio show
+  on Radio Foorti 88.0 FM — aired in {html.escape(year)}.
+  Click an episode to play it from the exact moment a story begins.
+</p>
+<nav class="seo-year-nav" aria-label="Browse other years">Browse other years: {year_nav}</nav>
+{items_html}
+<p class="seo-cta"><a href="/" class="seo-cta-link">← Search inside every episode →</a></p>
+"""
+
+    jsonld = [
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Bhoot FM Archive", "item": (PUBLIC_URL or "") + "/"},
+                {"@type": "ListItem", "position": 2, "name": f"Episodes from {year}", "item": (PUBLIC_URL or "") + f"/episodes/{year}"},
+            ],
+        },
+        {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": f"Bhoot FM episodes from {year}",
+            "description": f"All Bhoot FM episodes aired in {year}, hosted by RJ Russell on Radio Foorti 88.0 FM.",
+            "inLanguage": "bn",
+            "isPartOf": {"@type": "RadioSeries", "name": "Bhoot FM"},
+        },
+    ]
+    title = f"Bhoot FM episodes from {year} — Bhoot FM Archive"
+    desc = (f"All {len(rows)} Bhoot FM episodes from {year} with RJ Russell on Radio Foorti 88.0 FM. "
+            f"Stream every episode online for free. ভূত এফএম-এর {year} সালের সব এপিসোড।")
+    return Response(
+        content=_page_shell(title, desc, f"/episodes/{year}", body, jsonld),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/episode/{episode_id}")
+def episode_page(episode_id: str):
+    if not _EP_ID_RE.match(episode_id):
+        raise HTTPException(404, "Not found")
+    with get_db() as db:
+        ep = db.execute(
+            "SELECT id, air_date, title, duration_sec, mp3_url, transcript_status "
+            "FROM episodes WHERE id = ?",
+            (episode_id,),
+        ).fetchone()
+        if not ep:
+            raise HTTPException(404, "Not found")
+        # Adjacent episodes for prev/next nav.
+        prev_ep = db.execute(
+            "SELECT id, air_date, title FROM episodes "
+            "WHERE air_date < ? ORDER BY air_date DESC LIMIT 1",
+            (ep["air_date"],),
+        ).fetchone()
+        next_ep = db.execute(
+            "SELECT id, air_date, title FROM episodes "
+            "WHERE air_date > ? ORDER BY air_date ASC LIMIT 1",
+            (ep["air_date"],),
+        ).fetchone()
+
+    year = (ep["air_date"] or "")[:4]
+    dur = _fmt_duration(ep["duration_sec"])
+    iso_dur = _fmt_iso_duration(ep["duration_sec"])
+
+    prev_html = (
+        f'<a href="/episode/{html.escape(prev_ep["id"])}" rel="prev" class="seo-adj">'
+        f'← {html.escape(prev_ep["air_date"])}</a>'
+    ) if prev_ep else '<span class="seo-adj seo-adj-disabled">← older</span>'
+    next_html = (
+        f'<a href="/episode/{html.escape(next_ep["id"])}" rel="next" class="seo-adj">'
+        f'{html.escape(next_ep["air_date"])} →</a>'
+    ) if next_ep else '<span class="seo-adj seo-adj-disabled">newer →</span>'
+
+    body = f"""
+<nav class="seo-breadcrumb">
+  <a href="/">Home</a> /
+  <a href="/episodes/{html.escape(year)}">{html.escape(year)}</a> /
+  <span>{html.escape(ep["air_date"] or "")}</span>
+</nav>
+<article class="seo-episode">
+  <p class="seo-episode-kicker">Bhoot FM · <span lang="bn">ভূত এফএম</span> · {html.escape(ep["air_date"] or "")}</p>
+  <h1 class="seo-h1 seo-episode-title">{html.escape(ep["title"] or "")}</h1>
+  <dl class="seo-episode-meta">
+    <div><dt>Aired</dt><dd>{html.escape(ep["air_date"] or "")}</dd></div>
+    {'<div><dt>Duration</dt><dd>' + html.escape(dur) + '</dd></div>' if dur else ''}
+    <div><dt>Host</dt><dd>RJ Russell</dd></div>
+    <div><dt>Station</dt><dd>Radio Foorti 88.0 FM</dd></div>
+  </dl>
+  <p class="seo-episode-desc">
+    Episode of <strong>Bhoot FM</strong> aired on {html.escape(ep["air_date"] or "")}.
+    Listener-submitted Bangla ghost stories, paranormal encounters, and chilling
+    experiences with RJ Russell. Stream the full episode for free in the player.
+  </p>
+  <p class="seo-cta">
+    <a href="/#/ep/{html.escape(ep["id"])}" class="seo-cta-link">▶ Play this episode</a>
+  </p>
+  <nav class="seo-adj-nav" aria-label="Adjacent episodes">
+    {prev_html}
+    <a href="/episodes/{html.escape(year)}" class="seo-adj-up">All {html.escape(year)} episodes</a>
+    {next_html}
+  </nav>
+</article>
+"""
+
+    jsonld = [
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Bhoot FM Archive", "item": (PUBLIC_URL or "") + "/"},
+                {"@type": "ListItem", "position": 2, "name": f"Episodes from {year}", "item": (PUBLIC_URL or "") + f"/episodes/{year}"},
+                {"@type": "ListItem", "position": 3, "name": ep["title"] or ep["id"], "item": (PUBLIC_URL or "") + f"/episode/{ep['id']}"},
+            ],
+        },
+        {
+            "@context": "https://schema.org",
+            "@type": "RadioEpisode",
+            "name": ep["title"] or "",
+            "datePublished": ep["air_date"] or "",
+            "inLanguage": "bn",
+            **({"duration": iso_dur} if iso_dur else {}),
+            "partOfSeries": {
+                "@type": "RadioSeries",
+                "name": "Bhoot FM",
+                "actor": {"@type": "Person", "name": "RJ Russell"},
+                "productionCompany": {"@type": "RadioStation", "name": "Radio Foorti 88.0 FM"},
+            },
+            "url": (PUBLIC_URL or "") + f"/episode/{ep['id']}",
+        },
+    ]
+
+    title = f"{ep['title']} — Bhoot FM ({ep['air_date']}) | Bhoot FM Archive"
+    desc = (f"Listen to Bhoot FM episode from {ep['air_date']} with RJ Russell on Radio Foorti 88.0 FM. "
+            f"{'Duration: ' + dur + '. ' if dur else ''}Free streaming, jump to any moment. ভূত এফএম।")
+    return Response(
+        content=_page_shell(title, desc, f"/episode/{ep['id']}", body, jsonld),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+# ─── Cache-busting for HTML entry points ────────────────────────────
+# After a redeploy, mobile browsers (Edge Android in particular) cling to
+# the previously-cached app.js / style.css / banglish.js even when index.html
+# revalidates, because those assets have a long max-age. The fix is to make
+# each asset URL change when the deploy changes: we rewrite the references
+# inside index.html / about.html to include `?v=<version>`. The browser
+# treats the new URL as a different resource and fetches it fresh.
+#
+# Version source order:
+#   1. FLY_RELEASE_VERSION env (set automatically by Fly on each deploy)
+#   2. Hash of (mtime) for the asset files — picks up local edits during dev
+#   3. Process start time — last-resort uniqueness guarantee
+
+import hashlib
+
+def _compute_asset_version() -> str:
+    fly = os.environ.get("FLY_RELEASE_VERSION") or os.environ.get("FLY_MACHINE_VERSION")
+    if fly:
+        return fly[:12]
+    parts: list[str] = []
+    for name in ("app.js", "banglish.js", "style.css", "index.html", "about.html"):
+        p = STATIC_DIR / name
+        if p.exists():
+            parts.append(f"{name}:{int(p.stat().st_mtime)}")
+    if parts:
+        return hashlib.sha1("|".join(parts).encode()).hexdigest()[:12]
+    return str(int(time.time()))
+
+
+ASSET_VERSION = _compute_asset_version()
+log.info("asset version: %s", ASSET_VERSION)
+
+# Regex matches `src="app.js"` / `href="style.css"` etc. so we can splice the
+# version query in without parsing HTML. Same-origin paths only — leave CDN
+# URLs (Google Fonts, GoatCounter) alone since they don't share our cache.
+_ASSET_HREF_RE = re.compile(
+    r'((?:src|href)=")([^"#?]+\.(?:js|css|svg|png|webmanifest))(")'
+)
+
+
+def _bust_html_cache(body: str) -> str:
+    def sub(m: re.Match) -> str:
+        prefix, path, suffix = m.group(1), m.group(2), m.group(3)
+        # Skip absolute/protocol URLs — only own-origin assets need busting.
+        if path.startswith(("http://", "https://", "//")):
+            return m.group(0)
+        sep = "&" if "?" in path else "?"
+        return f"{prefix}{path}{sep}v={ASSET_VERSION}{suffix}"
+    return _ASSET_HREF_RE.sub(sub, body)
+
+
+def _serve_html_with_busting(filename: str) -> Response:
+    path = STATIC_DIR / filename
+    if not path.exists():
+        raise HTTPException(404)
+    body = path.read_text(encoding="utf-8")
+    body = _bust_html_cache(body)
+    # `no-cache` (not `no-store`) lets the browser keep the file but forces it
+    # to revalidate every load. With ETag/Last-Modified the server returns 304
+    # when unchanged — cheap, and guarantees users see the new asset URLs the
+    # moment a deploy ships.
+    return Response(
+        content=body,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-cache", "ETag": f'W/"{ASSET_VERSION}"'},
+    )
+
+
+@app.get("/")
+def serve_index():
+    return _serve_html_with_busting("index.html")
+
+
+@app.get("/index.html")
+def serve_index_html():
+    return _serve_html_with_busting("index.html")
+
+
+@app.get("/about.html")
+def serve_about_html():
+    return _serve_html_with_busting("about.html")
+
+
+# Static files — mounted last so /api/* and /sitemap.xml and the HTML
+# rewrites above all win. The mount handles every other static asset
+# (JS, CSS, fonts, images) directly from disk.
 if STATIC_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=False), name="static")
 
 
 if __name__ == "__main__":
