@@ -184,6 +184,14 @@
     return fmtDate(airDate);
   }
 
+  // Friday the 13th detector. ISO date is YYYY-MM-DD, parse in UTC so we
+  // don't get bit by the user's local timezone shifting the day-of-week.
+  function isFriday13th(iso) {
+    if (!iso) return false;
+    const d = new Date(iso + "T00:00:00Z");
+    return !isNaN(d) && d.getUTCDate() === 13 && d.getUTCDay() === 5;
+  }
+
   // ─── Listening history (localStorage, no accounts) ──────────────────
   // Map of { [epId]: { pos, dur, pct, updated } }.
   // pct >= 0.90 → completed. 0.02 < pct < 0.90 → in_progress. Else: not started.
@@ -289,13 +297,19 @@
     const progress = st?.status === "in_progress"
       ? `<div class="card-progress"><div class="card-progress-fill" style="width:${(pct * 100).toFixed(1)}%"></div></div>`
       : "";
+    const f13 = isFriday13th(ep.air_date);
+    const f13Cls = f13 ? " friday-13th" : "";
+    const f13Badge = f13
+      ? `<span class="f13-mark" aria-label="Aired on Friday the 13th" title="Aired on Friday the 13th">𓁹 13</span>`
+      : "";
     return `
-      <div class="card episode-card card-appear${cls}" data-ep-id="${ep.id}" style="animation-delay:${Math.min(idx, 20) * 18}ms">
+      <div class="card episode-card card-appear${cls}${f13Cls}" data-ep-id="${ep.id}" style="animation-delay:${Math.min(idx, 20) * 18}ms">
+        ${f13Badge}
         <div class="card-main">
           <div class="card-title">${escapeHtml(ep.title)}</div>
           <div class="card-date">${(() => {
             const d = dateIfNotInTitle(ep.title, ep.air_date);
-            const dur = ep.duration_sec ? fmtTs(ep.duration_sec) : "";
+            const dur = ep.duration_sec ? `Duration: ${fmtTs(ep.duration_sec)}` : "";
             return [d, dur].filter(Boolean).join(" · ");
           })()}</div>
         </div>

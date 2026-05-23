@@ -1300,6 +1300,12 @@ body.scroll-locked { overflow: hidden; touch-action: none; overscroll-behavior: 
 .episode-card .card-main { flex: 1 1 auto; min-width: 0; }
 .episode-card { padding-bottom: 18px; }
 
+/* Card subline centered under the title — keeps the lower half of the card
+   from looking empty now that the redundant date is gone. Only scoped to
+   .episode-card so search-result cards (which have a side-by-side title +
+   trace-count layout in .card-head) aren't affected. */
+.episode-card .card-date { text-align: center; margin-top: 6px; }
+
 /* Card context menu */
 .card-menu {
   position: fixed;
@@ -1949,3 +1955,61 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
   margin-left: 6px;
 }
 .translit-from em { color: var(--text-dim); font-style: italic; }
+
+/* ─── Friday the 13th treatment ─────────────────────────────────────
+   Episodes that aired on a Friday the 13th get extra dread. Used by
+   .episode-card.friday-13th — the JS sets the class via isFriday13th()
+   on the air date. Stays on-brand (no extra colors, just amplifies
+   existing blood/glow tokens) and animations honour reduced-motion. */
+.episode-card.friday-13th {
+  background:
+    linear-gradient(135deg, rgba(185, 28, 28, 0.22) 0%, rgba(20, 6, 10, 0.92) 55%, rgba(7, 7, 11, 0.96) 100%),
+    var(--bg-elev);
+  border-color: rgba(185, 28, 28, 0.55);
+  box-shadow:
+    0 0 22px -6px var(--blood-glow),
+    inset 0 0 30px -10px rgba(185, 28, 28, 0.35);
+  animation: f13-pulse 3.8s ease-in-out infinite;
+}
+.episode-card.friday-13th .card-title {
+  color: #ffe6e6;
+  text-shadow: 0 0 12px rgba(255, 60, 60, 0.45);
+}
+.episode-card.friday-13th .card-date {
+  color: rgba(255, 200, 200, 0.55);
+}
+.episode-card.friday-13th .f13-mark {
+  position: absolute;
+  top: 6px; right: 10px;
+  font-family: 'Creepster', 'Special Elite', serif;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--blood-soft);
+  text-shadow: 0 0 8px var(--blood-glow);
+  opacity: 0.92;
+  pointer-events: none;
+  animation: f13-flicker 4.7s infinite;
+}
+/* Cards in the main grid are position:relative already (badges / progress
+   bars sit absolutely inside them). Keep this rule belt-and-braces in case
+   the base .card ever drops that. */
+.episode-card.friday-13th { position: relative; }
+@keyframes f13-pulse {
+  0%, 100% {
+    box-shadow: 0 0 22px -6px var(--blood-glow),
+                inset 0 0 30px -10px rgba(185, 28, 28, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 34px -4px var(--blood-glow),
+                inset 0 0 44px -8px rgba(185, 28, 28, 0.55);
+  }
+}
+@keyframes f13-flicker {
+  0%, 18%, 22%, 70%, 73%, 100% { opacity: 0.92; }
+  20%, 71%                      { opacity: 0.25; }
+  21%                           { opacity: 1;    }
+}
+@media (prefers-reduced-motion: reduce) {
+  .episode-card.friday-13th        { animation: none; }
+  .episode-card.friday-13th .f13-mark { animation: none; }
+}
