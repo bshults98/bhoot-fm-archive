@@ -17,8 +17,8 @@
   const $nowMeta = document.getElementById("now-meta");
   const $dial = document.getElementById("dial");
   const $randomBtn      = document.getElementById("random-btn");
-  const $prevBtn        = document.getElementById("prev-btn");
-  const $nextBtn        = document.getElementById("next-btn");
+  const $skipBackBtn    = document.getElementById("skip-back-btn");
+  const $skipFwdBtn     = document.getElementById("skip-fwd-btn");
   const $expandBtn      = document.getElementById("expand-btn");
   const $collapseBtn    = document.getElementById("collapse-btn");
   const $expandedPlayer = document.getElementById("expanded-player");
@@ -175,6 +175,15 @@
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // Episode titles already follow the pattern "Bhoot FM — 13 Dec 2019", so
+  // re-showing the air date underneath is visual noise. Returns the formatted
+  // date only when the title doesn't already contain a 4-digit year.
+  function dateIfNotInTitle(title, airDate) {
+    if (!airDate) return "";
+    if (/\d{4}/.test(title || "")) return "";
+    return fmtDate(airDate);
+  }
+
   // ─── Listening history (localStorage, no accounts) ──────────────────
   // Map of { [epId]: { pos, dur, pct, updated } }.
   // pct >= 0.90 → completed. 0.02 < pct < 0.90 → in_progress. Else: not started.
@@ -284,7 +293,11 @@
       <div class="card episode-card card-appear${cls}" data-ep-id="${ep.id}" style="animation-delay:${Math.min(idx, 20) * 18}ms">
         <div class="card-main">
           <div class="card-title">${escapeHtml(ep.title)}</div>
-          <div class="card-date">${fmtDate(ep.air_date)}${ep.duration_sec ? " · " + fmtTs(ep.duration_sec) : ""}</div>
+          <div class="card-date">${(() => {
+            const d = dateIfNotInTitle(ep.title, ep.air_date);
+            const dur = ep.duration_sec ? fmtTs(ep.duration_sec) : "";
+            return [d, dur].filter(Boolean).join(" · ");
+          })()}</div>
         </div>
         ${badge}
         ${progress}
@@ -333,7 +346,11 @@
       }
     }
 
-    const meta = `${fmtDate(episode.air_date)}${episode.duration_sec ? " • " + fmtTs(episode.duration_sec) : ""}`;
+    const meta = (() => {
+      const d = dateIfNotInTitle(episode.title, episode.air_date);
+      const dur = episode.duration_sec ? fmtTs(episode.duration_sec) : "";
+      return [d, dur].filter(Boolean).join(" • ");
+    })();
     $nowTitle.textContent = episode.title;
     $nowMeta.textContent  = meta;
     $expEpTitle.textContent = episode.title;
@@ -381,14 +398,17 @@
       };
       setHandler("play",            () => { $audio.play().catch(() => {}); });
       setHandler("pause",           () => { $audio.pause(); });
-      setHandler("seekbackward",    e => { $audio.currentTime = Math.max(0, $audio.currentTime - (e?.seekOffset || 15)); });
-      setHandler("seekforward",     e => { $audio.currentTime = Math.min($audio.duration || 0, $audio.currentTime + (e?.seekOffset || 30)); });
+      setHandler("seekbackward",    e => { $audio.currentTime = Math.max(0, $audio.currentTime - (e?.seekOffset || 10)); });
+      setHandler("seekforward",     e => { $audio.currentTime = Math.min($audio.duration || 0, $audio.currentTime + (e?.seekOffset || 10)); });
       setHandler("seekto",          e => {
         if (e?.fastSeek && "fastSeek" in $audio) { $audio.fastSeek(e.seekTime); return; }
         if (e?.seekTime != null) $audio.currentTime = e.seekTime;
       });
-      setHandler("previoustrack",   () => { if (!$prevBtn.disabled) $prevBtn.click(); });
-      setHandler("nexttrack",       () => { if (!$nextBtn.disabled) $nextBtn.click(); });
+      // Episode prev/next no longer have on-screen buttons (those are now
+      // ±10s seek), but the lock-screen/headset controls still let listeners
+      // jump between episodes.
+      setHandler("previoustrack",   () => { skipEpisode(-1); });
+      setHandler("nexttrack",       () => { skipEpisode(+1); });
       navigator.mediaSession._bfaWired = true;
     }
   }
@@ -541,9 +561,38 @@
 
   // ── Expanded player toggle ────────────────────────────────────────────
   let isExpanded = false;
+  // Remember the scroll position so we can restore it when the expanded
+  // player closes. iOS Safari ignores `overflow: hidden` on body, so the
+  // bulletproof scroll-lock is `position: fixed; top: -<y>px`.
+  let savedScrollY = 0;
+
+  function lockBackgroundScroll() {
+    savedScrollY = window.scrollY || window.pageYOffset || 0;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${savedScrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.classList.add("scroll-locked");
+  }
+
+  function unlockBackgroundScroll() {
+    const body = document.body;
+    body.style.position = "";
+    body.style.top = "";
+    body.style.left = "";
+    body.style.right = "";
+    body.style.width = "";
+    body.classList.remove("scroll-locked");
+    // Restore the previous scroll position synchronously — without this,
+    // closing the player snaps the page back to the top.
+    window.scrollTo(0, savedScrollY);
+  }
 
   function openExpanded() {
     isExpanded = true;
+    lockBackgroundScroll();
     $expandedPlayer.classList.add("open");
     $expandedPlayer.setAttribute("aria-hidden", "false");
     $expandBtn.classList.add("active");
@@ -559,6 +608,7 @@
     $expandedPlayer.classList.remove("open");
     $expandedPlayer.setAttribute("aria-hidden", "true");
     $expandBtn.classList.remove("active");
+    unlockBackgroundScroll();
     if (bigVizRaf) { cancelAnimationFrame(bigVizRaf); bigVizRaf = null; }
     // Clear particle state so next open starts fresh.
     bvParticles.length = 0;
@@ -891,7 +941,11 @@
     $heroResume.dataset.pos = String(top.pos || 0);
     $heroResume.dataset.dur = String(top.dur || ep.duration_sec || 0);
     $heroTitle.textContent = ep.title;
-    $heroMeta.textContent = `${fmtDate(ep.air_date)} · ${fmtTs(top.pos || 0)} / ${fmtTs(top.dur || ep.duration_sec || 0)}`;
+    {
+      const d = dateIfNotInTitle(ep.title, ep.air_date);
+      const pos = `${fmtTs(top.pos || 0)} / ${fmtTs(top.dur || ep.duration_sec || 0)}`;
+      $heroMeta.textContent = d ? `${d} · ${pos}` : pos;
+    }
     $heroProgressFill.style.width = `${(top.pct * 100).toFixed(1)}%`;
     $heroResumeTime.textContent = `from ${fmtTs(top.pos || 0)}`;
   }
@@ -1098,7 +1152,7 @@
           <div class="card-head">
             <div>
               <div class="card-title">${escapeHtml(ep.episode_title)}</div>
-              <div class="card-date">${fmtDate(ep.episode_date)}</div>
+              <div class="card-date">${escapeHtml(dateIfNotInTitle(ep.episode_title, ep.episode_date))}</div>
             </div>
             <div class="card-count">${ep.hits.length} ${ep.hits.length === 1 ? "trace" : "traces"}</div>
           </div>
@@ -1142,8 +1196,12 @@
       state.currentEpisode = data.episode;
       state.currentSegments = data.segments;
       $tTitle.textContent = data.episode.title;
-      $tMeta.textContent =
-        `${fmtDate(data.episode.air_date)}${data.episode.duration_sec ? " · " + fmtTs(data.episode.duration_sec) : ""}${data.segments.length ? " · " + data.segments.length + " markers" : ""}`;
+      {
+        const d = dateIfNotInTitle(data.episode.title, data.episode.air_date);
+        const dur = data.episode.duration_sec ? fmtTs(data.episode.duration_sec) : "";
+        const markers = data.segments.length ? `${data.segments.length} markers` : "";
+        $tMeta.textContent = [d, dur, markers].filter(Boolean).join(" · ");
+      }
       setMeta({
         title: `${data.episode.title} — ${SITE_NAME}`,
         description: `${data.episode.title}. Listen to this Bhoot FM episode at any moment.`,
@@ -1216,21 +1274,28 @@
     updateMarkerHighlight();
   });
 
-  // ─── Prev / Next episode ─────────────────────────────────────────────
+  // ─── ±10s seek + episode prev/next (used by media session & auto-advance) ─
+  // The on-screen player buttons used to be ⏮/⏭ episode-skip; we replaced
+  // them with ±10s seek because that's the action listeners actually want
+  // mid-story. Episode navigation lives on the lock screen and auto-advance
+  // on `ended`.
   function updateSkipButtons() {
-    const eps = state.allEpisodes;
-    const epId = $audio.dataset.episodeId;
-    if (!eps || !epId) {
-      $prevBtn.disabled = true;
-      $nextBtn.disabled = true;
-      return;
-    }
-    const idx = eps.findIndex(e => e.id === epId);
-    // Episodes are sorted newest-first, so:
-    //   prev (⏮) = lower index  = newer episode
-    //   next (⏭) = higher index = older episode
-    $prevBtn.disabled = idx <= 0;
-    $nextBtn.disabled = idx < 0 || idx >= eps.length - 1;
+    // Enable seek buttons whenever an episode is loaded — there's always
+    // something to seek within once playback has started.
+    const hasEp = !!$audio.dataset.episodeId;
+    if ($skipBackBtn) $skipBackBtn.disabled = !hasEp;
+    if ($skipFwdBtn)  $skipFwdBtn.disabled  = !hasEp;
+  }
+
+  function seekRelative(delta) {
+    if (!$audio.dataset.episodeId) return;
+    const dur = $audio.duration;
+    const cur = $audio.currentTime || 0;
+    let next = cur + delta;
+    if (next < 0) next = 0;
+    if (dur && isFinite(dur) && next > dur) next = dur;
+    $audio.currentTime = next;
+    updateMediaSessionState();
   }
 
   async function skipEpisode(dir) {
@@ -1256,8 +1321,85 @@
     } catch { return; }
   }
 
-  $prevBtn.addEventListener("click", () => skipEpisode(-1));
-  $nextBtn.addEventListener("click", () => skipEpisode(+1));
+  // Tap = single 10s seek. Press-and-hold = accelerating seek that ramps up
+  // from 10s/tick to 60s/tick the longer you hold. Lets listeners scrub past
+  // an ad break or skip ahead a few minutes without spamming the button.
+  function attachAcceleratingSeek($btn, sign) {
+    if (!$btn) return;
+    const STEP_MS = 220;          // how often the auto-fire ticks
+    const HOLD_DELAY_MS = 380;    // taps below this resolve as one 10s seek
+    const STEPS = [10, 15, 20, 30, 45, 60];
+
+    let downTime = 0;
+    let timer = null;
+    let stepIdx = 0;
+    let didAccelerate = false;
+    let pointerId = null;
+
+    function startAccelerator() {
+      didAccelerate = true;
+      stepIdx = 0;
+      const tick = () => {
+        seekRelative(sign * STEPS[Math.min(stepIdx, STEPS.length - 1)]);
+        stepIdx += 1;
+        timer = setTimeout(tick, STEP_MS);
+      };
+      // First accelerated step fires immediately so the user sees motion.
+      tick();
+    }
+
+    function cancel() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      $btn.classList.remove("seeking");
+      if (pointerId != null) {
+        try { $btn.releasePointerCapture(pointerId); } catch {}
+        pointerId = null;
+      }
+    }
+
+    $btn.addEventListener("pointerdown", e => {
+      // Ignore right-click / middle-click.
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      e.preventDefault();
+      downTime = performance.now();
+      didAccelerate = false;
+      pointerId = e.pointerId;
+      try { $btn.setPointerCapture(pointerId); } catch {}
+      $btn.classList.add("seeking");
+      // Schedule the hold-to-accelerate transition. If pointerup fires
+      // before this lands, the up-handler does the single-tap seek instead.
+      timer = setTimeout(startAccelerator, HOLD_DELAY_MS);
+    });
+
+    const finish = () => {
+      const held = performance.now() - downTime;
+      cancel();
+      // Tap (no acceleration fired) → single 10s seek.
+      if (!didAccelerate && held < HOLD_DELAY_MS + 80) {
+        seekRelative(sign * 10);
+      }
+    };
+
+    $btn.addEventListener("pointerup", finish);
+    $btn.addEventListener("pointercancel", cancel);
+    // If the pointer leaves the button mid-hold (finger slides off) we treat
+    // it as cancel — same convention native scrub controls use.
+    $btn.addEventListener("pointerleave", () => {
+      if (didAccelerate) cancel();
+    });
+
+    // Keyboard activation (Enter/Space) bypasses pointer events entirely;
+    // catch it explicitly so screen-reader / keyboard users get a 10s seek.
+    $btn.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        seekRelative(sign * 10);
+      }
+    });
+  }
+
+  attachAcceleratingSeek($skipBackBtn, -1);
+  attachAcceleratingSeek($skipFwdBtn,  +1);
 
   // Auto-advance to next episode when one finishes — unless sleep timer
   // asked us to stop at the end of the episode.

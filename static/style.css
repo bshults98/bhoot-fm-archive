@@ -627,6 +627,12 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
 }
 .expanded-player.open { transform: translateY(0); }
 
+/* Background scroll lock — applied to <body> while the expanded player is
+   open. The JS sets position:fixed + top inline (so it survives iOS Safari);
+   this rule kills any residual scroll affordance on browsers that ignore the
+   position trick (older Edge mobile, in-app webviews). */
+body.scroll-locked { overflow: hidden; touch-action: none; overscroll-behavior: contain; }
+
 .collapse-btn {
   position: absolute;
   top: 20px; left: 50%; transform: translateX(-50%);
@@ -755,6 +761,21 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
 .skip-btn:disabled {
   opacity: 0.25;
   cursor: not-allowed;
+}
+/* Press-and-hold accelerating seek — subtle glow + scale so the user can
+   tell the button has entered the "scrubbing" phase vs. a single tap. */
+.skip-btn.seeking:not(:disabled) {
+  color: var(--blood-soft);
+  border-color: var(--blood);
+  box-shadow: 0 0 14px -2px var(--blood-glow);
+  animation: skip-pulse 0.55s ease-in-out infinite;
+}
+@keyframes skip-pulse {
+  0%, 100% { transform: scale(0.95); }
+  50%      { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-btn.seeking { animation: none; }
 }
 
 .scrubber-wrap {
