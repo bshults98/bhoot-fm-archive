@@ -939,6 +939,307 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
   .brand .tagline { font-size: 11px; letter-spacing: 3px; }
 }
 
+/* ─── Home view ─────────────────────────────────────────────────── */
+.home { display: flex; flex-direction: column; gap: 28px; }
+
+/* Continue-listening hero */
+.hero {
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.14) 0%, rgba(20, 8, 16, 0.85) 60%, rgba(7, 7, 11, 0.92) 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content: "𓁹";
+  position: absolute; right: 18px; top: 8px;
+  font-size: 70px; color: var(--blood-soft);
+  opacity: 0.07; pointer-events: none;
+  text-shadow: 0 0 24px var(--blood-glow);
+}
+.hero-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--blood-soft);
+  margin-bottom: 8px;
+}
+.hero-title {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: clamp(20px, 3.4vw, 26px);
+  color: var(--bone);
+  letter-spacing: 1.2px;
+  margin-bottom: 4px;
+}
+.hero-meta {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.hero-progress {
+  height: 4px; background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px; overflow: hidden;
+  margin-bottom: 16px;
+}
+.hero-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blood) 0%, var(--blood-soft) 100%);
+  box-shadow: 0 0 10px -2px var(--blood-glow);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+.hero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero-btn {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 12px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  min-height: 38px;
+}
+.hero-btn.primary {
+  background: var(--blood);
+  border: 1px solid var(--blood);
+  color: var(--bone);
+}
+.hero-btn.primary:hover {
+  background: var(--blood-soft); border-color: var(--blood-soft);
+  box-shadow: 0 0 18px -2px var(--blood-glow);
+}
+.hero-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.hero-btn.ghost:hover {
+  border-color: var(--blood);
+  color: var(--blood-soft);
+}
+.hero-time { opacity: 0.85; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+/* Rails (tonight's pick, recently played) */
+.rails { display: flex; flex-direction: column; gap: 22px; }
+.rail-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--blood-soft);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+.rail-sub {
+  color: var(--text-faint);
+  font-size: 10px; letter-spacing: 2px; text-transform: none;
+  font-style: italic;
+}
+.rail-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font-family: 'Special Elite', monospace;
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  padding: 4px 8px; border-radius: 3px; cursor: pointer;
+  margin-left: auto;
+}
+.rail-clear:hover { color: var(--blood-soft); border-color: var(--blood); }
+.rail-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+
+/* Tonight's pick — single feature card, wide and prominent. */
+#rail-tonight .rail-cards { grid-template-columns: 1fr; }
+#rail-tonight .episode-card {
+  padding: 22px 24px 22px;
+  background:
+    linear-gradient(135deg, rgba(185, 28, 28, 0.16) 0%, rgba(20, 8, 16, 0.85) 55%, rgba(7, 7, 11, 0.92) 100%),
+    var(--bg-elev);
+  border-color: rgba(185, 28, 28, 0.32);
+  box-shadow: 0 0 30px -10px var(--blood-glow);
+}
+#rail-tonight .episode-card::after {
+  content: "𓁹";
+  position: absolute; right: 18px; top: 6px;
+  font-size: 88px; color: var(--blood-soft);
+  opacity: 0.07; pointer-events: none;
+  text-shadow: 0 0 24px var(--blood-glow);
+}
+#rail-tonight .card-title { font-size: clamp(20px, 3vw, 24px); }
+#rail-tonight .card-date  { font-size: 13px; margin-top: 6px; }
+.rail-scroll {
+  grid-template-columns: none;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.rail-scroll .card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
+  margin-bottom: 0;
+}
+.rail-scroll::-webkit-scrollbar { height: 6px; }
+.rail-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Browse section */
+.browse-head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.browse-label {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--blood-soft);
+}
+.browse-sub {
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 11px; letter-spacing: 1.5px; color: var(--text-faint);
+}
+.years, .months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.year-pill, .month-pill {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  min-height: 36px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.year-pill:hover, .month-pill:hover {
+  color: var(--blood-soft); border-color: var(--blood);
+}
+.year-pill.active, .month-pill.active {
+  background: var(--blood);
+  color: var(--bone);
+  border-color: var(--blood);
+  box-shadow: 0 0 14px -4px var(--blood-glow);
+}
+.pill-count {
+  font-size: 10px; opacity: 0.7;
+  letter-spacing: 1px;
+}
+.browse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.browse-grid .card { margin-bottom: 0; }
+
+/* Card status decorations (used everywhere — home, browse, search) */
+.card.ep-completed { opacity: 0.78; }
+.card.ep-completed .card-title::before {
+  content: "✓ ";
+  color: var(--bone);
+  opacity: 0.6;
+}
+.card-badge {
+  position: absolute; top: 10px; right: 12px;
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.card-badge.done { color: var(--text-faint); }
+.card-badge.in-prog { color: var(--blood-soft); }
+.card-progress {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+}
+.card-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blood) 0%, var(--blood-soft) 100%);
+  box-shadow: 0 0 8px -1px var(--blood-glow);
+}
+
+/* Episode card — used everywhere */
+.episode-card .card-main { flex: 1 1 auto; min-width: 0; }
+.episode-card { padding-bottom: 18px; }
+
+/* Card context menu */
+.card-menu {
+  position: fixed;
+  z-index: 30;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 18px -6px var(--blood-glow);
+  min-width: 180px;
+  display: flex; flex-direction: column;
+}
+.card-menu-item {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-menu-item:hover { background: rgba(185, 28, 28, 0.18); color: var(--blood-soft); }
+.card-menu-item.danger:hover { color: var(--blood-soft); }
+.card-menu-sep {
+  height: 1px; background: var(--border-soft); margin: 4px 6px;
+}
+
+/* Reset history link in footer — styled to match neighboring about-link */
+button.about-link.reset-history-btn {
+  background: none;
+  border: none;
+  border-bottom: 1px dotted var(--text-faint);
+  padding: 0 0 1px;
+  font: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  color: var(--text-faint);
+  letter-spacing: inherit;
+}
+button.about-link.reset-history-btn:hover {
+  color: var(--blood-soft);
+  border-bottom-color: var(--blood);
+}
+.device-note {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
+  letter-spacing: 1px;
+  margin-top: 6px;
+}
+.device-note em { color: var(--text-dim); font-style: normal; }
+
+/* Mobile tweaks for the new home view */
+@media (max-width: 700px) {
+  .home { gap: 22px; }
+  .hero { padding: 16px 16px; }
+  .hero::after { font-size: 56px; right: 10px; top: 4px; }
+  .rail-cards { grid-template-columns: 1fr; }
+  .browse-grid { grid-template-columns: 1fr; }
+  .year-pill, .month-pill { padding: 8px 12px; font-size: 11px; }
+  .rail-scroll .card { flex-basis: 86vw; }
+}
+
 /* ─── Easter eggs & blood ───────────────────────────────────────── */
 
 /* Screen-edge bleed — flickered onto <body> when a horror word is typed

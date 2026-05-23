@@ -137,6 +137,51 @@
 
 <main id="main" role="main">
   <section id="status" class="status" aria-live="polite"></section>
+
+  <section id="home" class="home hidden" aria-label="Home">
+    <!-- Continue listening hero (only shown if there's an in-progress episode) -->
+    <div id="hero-resume" class="hero hidden">
+      <div class="hero-label">▶ Continue listening</div>
+      <div class="hero-title" id="hero-title">—</div>
+      <div class="hero-meta" id="hero-meta"></div>
+      <div class="hero-progress" aria-hidden="true">
+        <div class="hero-progress-fill" id="hero-progress-fill"></div>
+      </div>
+      <div class="hero-actions">
+        <button class="hero-btn primary" id="hero-resume-btn">▶ Resume <span id="hero-resume-time" class="hero-time"></span></button>
+        <button class="hero-btn ghost" id="hero-restart-btn">↺ Start over</button>
+        <button class="hero-btn ghost" id="hero-dismiss-btn" title="Mark as played">✓ Mark played</button>
+      </div>
+    </div>
+
+    <!-- Tonight's pick + Recently played -->
+    <div class="rails">
+      <div class="rail" id="rail-tonight">
+        <div class="rail-label">𓁹 Tonight's pick <span class="rail-sub">— chosen for tonight only</span></div>
+        <div class="rail-cards" id="rail-tonight-cards"></div>
+      </div>
+      <div class="rail hidden" id="rail-recent">
+        <div class="rail-label">⏱ Recently played <button type="button" id="rail-recent-clear" class="rail-clear" title="Clear history on this device">clear</button></div>
+        <div class="rail-cards rail-scroll" id="rail-recent-cards"></div>
+      </div>
+      <div class="rail hidden" id="rail-mostplayed">
+        <div class="rail-label">☠ Most played <span class="rail-sub">— what other listeners keep coming back to</span></div>
+        <div class="rail-cards" id="rail-mostplayed-cards"></div>
+      </div>
+    </div>
+
+    <!-- Browse the archive -->
+    <div class="browse">
+      <div class="browse-head">
+        <div class="browse-label">⛧ Browse the archive</div>
+        <div class="browse-sub" id="browse-sub"></div>
+      </div>
+      <div class="years" id="year-pills" role="tablist" aria-label="Year"></div>
+      <div class="months hidden" id="month-pills" role="tablist" aria-label="Month"></div>
+      <div class="browse-grid" id="browse-grid"></div>
+    </div>
+  </section>
+
   <section id="results" class="results"></section>
   <section id="transcript" class="transcript hidden" aria-label="Episode markers">
     <button class="back-btn" id="back-to-results">← back</button>
@@ -179,6 +224,10 @@
       original creators — Radio Foorti and the Bhoot FM team.
       <span aria-hidden="true">𓁹</span>
       &nbsp;·&nbsp; <a href="/about.html" class="about-link">about &amp; takedown</a>
+      &nbsp;·&nbsp; <button type="button" class="about-link reset-history-btn" id="reset-history-btn" title="Clear listening history on this device">reset listening history</button>
+    </p>
+    <p class="device-note">
+      Your listening history is saved on <em>this device only</em>. No account, no server-side tracking.
     </p>
   </section>
 </main>

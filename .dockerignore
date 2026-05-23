@@ -20,6 +20,11 @@ manifest.json
 transcripts/
 scripts/
 
+# Dev play-counts DB — runtime-only, never ship dev counts into prod
+plays.db
+plays.db-wal
+plays.db-shm
+
 # Local-only
 *.docx
 *.json

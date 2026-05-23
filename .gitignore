@@ -7,6 +7,8 @@ transcripts/
 
 # Dev database — ingest.py writes this locally; prod DB is archive.prod.db
 archive.db
+# Play-counts DB — runtime-only, created on first POST /api/play
+plays.db
 # SQLite WAL temp files — never commit these
 *.db-shm
 *.db-wal

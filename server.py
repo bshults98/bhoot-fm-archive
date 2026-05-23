@@ -45,6 +45,15 @@ from fastapi.staticfiles import StaticFiles
 DB_PATH = Path(__file__).parent / "archive.db"
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Per-episode play counts. Lives in its own SQLite file so the read-only
+# archive.db can stay read-only and so the file can be put on a persistent
+# volume separately from the bundled archive. Set BFA_PLAYS_DB_PATH to a
+# persistent-storage path (e.g. /data/plays.db on Fly volume or HF Spaces
+# persistent storage) — without that, counts reset on every redeploy.
+PLAYS_DB_PATH = Path(
+    os.environ.get("BFA_PLAYS_DB_PATH", str(Path(__file__).parent / "plays.db"))
+)
+
 # Public-facing brand. Set BFA_PUBLIC_URL via env for production
 # (e.g. "https://bhoot-fm-archive.fly.dev").
 PUBLIC_URL = os.environ.get("BFA_PUBLIC_URL", "").rstrip("/")
@@ -65,6 +74,11 @@ MAX_RANGE_BYTES = 16 * 1024 * 1024   # 16 MB per Range request (plenty for audio
 SEARCH_BURST = 12
 SEARCH_REFILL_PER_SEC = 0.6     # ~36 req/min sustained
 SEARCH_BUCKET_TTL = 600         # forget IPs idle longer than this
+
+# Play-counting endpoint: gentler bucket since the client only pings once
+# per (episode, device) per session, but still bounded against abuse.
+PLAYS_BURST = 30
+PLAYS_REFILL_PER_SEC = 0.5      # ~30 req/min sustained
 
 log = logging.getLogger("archive")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -101,6 +115,28 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+def get_plays_db() -> sqlite3.Connection:
+    """Read-write connection to the plays counter DB."""
+    conn = sqlite3.connect(str(PLAYS_DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def _ensure_plays_schema() -> None:
+    PLAYS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with get_plays_db() as db:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS plays ("
+            "  episode_id TEXT PRIMARY KEY, "
+            "  count INTEGER NOT NULL DEFAULT 0, "
+            "  last_at INTEGER NOT NULL DEFAULT 0"
+            ")"
+        )
+        db.execute("CREATE INDEX IF NOT EXISTS plays_count_idx ON plays(count DESC)")
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not DB_PATH.exists():
@@ -109,6 +145,8 @@ async def lifespan(app: FastAPI):
     # to surface schema problems immediately rather than on first request.
     with get_db() as db:
         db.execute("SELECT 1 FROM episodes LIMIT 1").fetchone()
+    _ensure_plays_schema()
+    log.info("plays db at %s", PLAYS_DB_PATH)
     yield
 
 
@@ -232,6 +270,7 @@ class _TokenBucket:
 
 
 _search_limiter = _TokenBucket()
+_plays_limiter = _TokenBucket()
 
 
 def _client_ip(request: Request) -> str:
@@ -335,6 +374,77 @@ def list_episodes(
             d["mp3_url"] = f"/api/episode/{d['id']}/audio"
         out.append(d)
     return JSONResponse({"episodes": out}, headers=_CACHEABLE_HEADERS)
+
+
+_EP_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(-pt\d)?$")
+
+
+@app.post("/api/play")
+async def record_play(request: Request):
+    """Bump the play count for an episode. Client should call this once per
+    (episode, device) after >=15 seconds of playback. Validates that the
+    episode exists in the archive."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    episode_id = (body or {}).get("episode_id") if isinstance(body, dict) else None
+    if not isinstance(episode_id, str) or not _EP_ID_RE.match(episode_id):
+        raise HTTPException(400, "Invalid episode_id")
+    ip = _client_ip(request)
+    if not _plays_limiter.take(ip, PLAYS_BURST, PLAYS_REFILL_PER_SEC):
+        raise HTTPException(429, "Slow down")
+    with get_db() as db:
+        exists = db.execute(
+            "SELECT 1 FROM episodes WHERE id = ?", (episode_id,)
+        ).fetchone()
+    if not exists:
+        raise HTTPException(404, "Episode not found")
+    now = int(time.time())
+    with get_plays_db() as pdb:
+        pdb.execute(
+            "INSERT INTO plays (episode_id, count, last_at) VALUES (?, 1, ?) "
+            "ON CONFLICT(episode_id) DO UPDATE SET "
+            "  count = count + 1, last_at = excluded.last_at",
+            (episode_id, now),
+        )
+        pdb.commit()
+    return {"ok": True}
+
+
+@app.get("/api/popular")
+def popular(limit: int = Query(3, ge=1, le=20)):
+    """Top-N most-played episodes across all visitors, with episode metadata."""
+    with get_plays_db() as pdb:
+        rows = pdb.execute(
+            "SELECT episode_id, count FROM plays "
+            "ORDER BY count DESC, last_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    ids = [r["episode_id"] for r in rows]
+    counts = {r["episode_id"]: r["count"] for r in rows}
+    headers = {"Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600"}
+    if not ids:
+        return JSONResponse({"episodes": []}, headers=headers)
+    placeholders = ",".join("?" * len(ids))
+    with get_db() as db:
+        ep_rows = db.execute(
+            "SELECT id, air_date, title, mp3_url, duration_sec, transcript_status, "
+            "(local_mp3_path IS NOT NULL) AS has_local "
+            f"FROM episodes WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+    by_id = {r["id"]: dict(r) for r in ep_rows}
+    out = []
+    for eid in ids:  # preserve popularity order
+        ep = by_id.get(eid)
+        if not ep:
+            continue
+        if ep.get("has_local"):
+            ep["mp3_url"] = f"/api/episode/{ep['id']}/audio"
+        ep["play_count"] = counts[eid]
+        out.append(ep)
+    return JSONResponse({"episodes": out}, headers=headers)
 
 
 @app.get("/api/episode/{episode_id}")

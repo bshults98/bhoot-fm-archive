@@ -35,6 +35,28 @@
   const $timeCur = document.getElementById("time-cur");
   const $timeDur = document.getElementById("time-dur");
   const $dripLayer = document.getElementById("drip-layer");
+  // Home view refs
+  const $home = document.getElementById("home");
+  const $heroResume = document.getElementById("hero-resume");
+  const $heroTitle = document.getElementById("hero-title");
+  const $heroMeta = document.getElementById("hero-meta");
+  const $heroProgressFill = document.getElementById("hero-progress-fill");
+  const $heroResumeBtn = document.getElementById("hero-resume-btn");
+  const $heroResumeTime = document.getElementById("hero-resume-time");
+  const $heroRestartBtn = document.getElementById("hero-restart-btn");
+  const $heroDismissBtn = document.getElementById("hero-dismiss-btn");
+  const $railTonight = document.getElementById("rail-tonight");
+  const $railTonightCards = document.getElementById("rail-tonight-cards");
+  const $railRecent = document.getElementById("rail-recent");
+  const $railRecentCards = document.getElementById("rail-recent-cards");
+  const $railRecentClear = document.getElementById("rail-recent-clear");
+  const $yearPills = document.getElementById("year-pills");
+  const $monthPills = document.getElementById("month-pills");
+  const $browseGrid = document.getElementById("browse-grid");
+  const $browseSub = document.getElementById("browse-sub");
+  const $railMostPlayed = document.getElementById("rail-mostplayed");
+  const $railMostPlayedCards = document.getElementById("rail-mostplayed-cards");
+  const $resetHistoryBtn = document.getElementById("reset-history-btn");
 
   // Clean up any leftover flag from the Webamp experiment.
   try { localStorage.removeItem("bfa_webamp"); } catch {}
@@ -102,6 +124,122 @@
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // ─── Listening history (localStorage, no accounts) ──────────────────
+  // Map of { [epId]: { pos, dur, pct, updated } }.
+  // pct >= 0.90 → completed. 0.02 < pct < 0.90 → in_progress. Else: not started.
+  const HIST_KEY = "bfa_history_v1";
+  const HIST_MAX_ENTRIES = 250;
+  function historyLoad() {
+    try { return JSON.parse(localStorage.getItem(HIST_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function historySave(h) {
+    try {
+      const keys = Object.keys(h);
+      if (keys.length > HIST_MAX_ENTRIES) {
+        // Drop the oldest by `updated` to stay under the cap.
+        keys.sort((a, b) => (h[a].updated || 0) - (h[b].updated || 0));
+        for (let i = 0; i < keys.length - HIST_MAX_ENTRIES; i++) delete h[keys[i]];
+      }
+      localStorage.setItem(HIST_KEY, JSON.stringify(h));
+    } catch {}
+  }
+  // An episode counts as touched once it's been played for >= 15 seconds.
+  // Anything shorter is treated as "didn't really listen" and stays unstarted.
+  const HIST_MIN_POS_SEC = 15;
+  function historyStatus(epId) {
+    if (!epId) return null;
+    const rec = historyLoad()[epId];
+    if (!rec) return null;
+    const pct = rec.pct || 0;
+    const pos = rec.pos || 0;
+    let status = null;
+    if (pct >= 0.90) status = "completed";
+    else if (pos >= HIST_MIN_POS_SEC) status = "in_progress";
+    return status ? { status, ...rec } : null;
+  }
+  function historyUpdate(epId, pos, dur) {
+    if (!epId || !dur || !isFinite(dur) || dur <= 0) return;
+    const h = historyLoad();
+    const prev = h[epId] || {};
+    // Once completed, don't overwrite back to in-progress just because the
+    // user started replaying the episode — keep the ✓ on the card.
+    const completed = prev.pct >= 0.90;
+    const pct = Math.max(0, Math.min(1, pos / dur));
+    h[epId] = {
+      pos: Math.floor(pos),
+      dur: Math.floor(dur),
+      pct: completed ? Math.max(prev.pct, pct) : pct,
+      updated: Date.now(),
+    };
+    historySave(h);
+  }
+  function historyMarkPlayed(epId, dur) {
+    if (!epId) return;
+    const h = historyLoad();
+    const d = dur || (h[epId] && h[epId].dur) || 0;
+    h[epId] = { pos: d, dur: d, pct: 1, updated: Date.now() };
+    historySave(h);
+  }
+  function historyRemove(epId) {
+    if (!epId) return;
+    const h = historyLoad();
+    delete h[epId];
+    historySave(h);
+  }
+  function historyClear() {
+    try {
+      localStorage.removeItem(HIST_KEY);
+      // Also clear the per-episode "already pinged the server" flags so
+      // a true reset means the user can contribute play counts again.
+      const toDel = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("bfa_pinged_")) toDel.push(k);
+      }
+      for (const k of toDel) localStorage.removeItem(k);
+    } catch {}
+  }
+  function historyRecent(n = 5) {
+    const h = historyLoad();
+    return Object.entries(h)
+      .map(([id, r]) => ({ id, ...r }))
+      .sort((a, b) => (b.updated || 0) - (a.updated || 0))
+      .slice(0, n);
+  }
+  function historyInProgress() {
+    const h = historyLoad();
+    return Object.entries(h)
+      .map(([id, r]) => ({ id, ...r }))
+      .filter(r => (r.pos || 0) >= HIST_MIN_POS_SEC && (r.pct || 0) < 0.90)
+      .sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  }
+
+  // Card HTML used by home rails, browse grid, etc. Cards show status.
+  function cardHtml(ep, idx = 0) {
+    const st = historyStatus(ep.id);
+    const cls = st?.status === "completed" ? " ep-completed"
+              : st?.status === "in_progress" ? " ep-in-progress" : "";
+    const pct = st?.pct ?? 0;
+    const badge = st?.status === "completed"
+      ? `<span class="card-badge done">✓ played</span>`
+      : st?.status === "in_progress"
+        ? `<span class="card-badge in-prog">${Math.round(pct * 100)}%</span>`
+        : "";
+    const progress = st?.status === "in_progress"
+      ? `<div class="card-progress"><div class="card-progress-fill" style="width:${(pct * 100).toFixed(1)}%"></div></div>`
+      : "";
+    return `
+      <div class="card episode-card card-appear${cls}" data-ep-id="${ep.id}" style="animation-delay:${Math.min(idx, 20) * 18}ms">
+        <div class="card-main">
+          <div class="card-title">${escapeHtml(ep.title)}</div>
+          <div class="card-date">${fmtDate(ep.air_date)}${ep.duration_sec ? " · " + fmtTs(ep.duration_sec) : ""}</div>
+        </div>
+        ${badge}
+        ${progress}
+      </div>`;
+  }
+
   // ─── SEO: dynamic title + canonical + description ───────────────────
   function setMeta({ title, description }) {
     document.title = title || SITE_NAME;
@@ -123,6 +261,8 @@
       return { type: "query", q: decodeURIComponent(parts.slice(1).join("/")) };
     if (parts[0] === "ep" && parts[1])
       return { type: "ep", id: parts[1], at: parts[2] ? parseFloat(parts[2]) : null };
+    if (parts[0] === "y" && /^\d{4}$/.test(parts[1] || ""))
+      return { type: "home", year: parts[1], month: /^\d{2}$/.test(parts[2] || "") ? parts[2] : null };
     return { type: "home" };
   }
 
@@ -130,6 +270,18 @@
   let currentTimeSec = 0;
 
   function playEpisodeAt(episode, startSec) {
+    // Before swapping to a different episode, save the OUTGOING one's last
+    // known position so we don't lose the last few seconds of progress that
+    // happened between the most recent 10s-interval tick and the switch.
+    const prevId = $audio.dataset.episodeId;
+    if (prevId && prevId !== episode.id) {
+      const prevDur = $audio.duration;
+      const prevPos = $audio.currentTime;
+      if (prevDur && isFinite(prevDur) && prevDur > 0) {
+        historyUpdate(prevId, prevPos, prevDur);
+      }
+    }
+
     const meta = `${fmtDate(episode.air_date)}${episode.duration_sec ? " • " + fmtTs(episode.duration_sec) : ""}`;
     $nowTitle.textContent = episode.title;
     $nowMeta.textContent  = meta;
@@ -328,53 +480,259 @@
   });
 
   // ─── Views ───────────────────────────────────────────────────────────
-  async function renderEpisodes() {
-    state.view = "episodes";
-    $transcript.classList.add("hidden");
-    $results.classList.remove("hidden");
-    setMeta({
-      title: SITE_NAME,
-      description: BASE_DESC,
-    });
+  // Show/hide the three top-level sections. Only one is visible at a time.
+  function showSection(name) {
+    $home.classList.toggle("hidden", name !== "home");
+    $results.classList.toggle("hidden", name !== "results");
+    $transcript.classList.toggle("hidden", name !== "transcript");
+  }
+
+  // Year/month index built once from /api/episodes.
+  function buildYearIndex(eps) {
+    const idx = {};
+    for (const ep of eps) {
+      const m = /^(\d{4})-(\d{2})/.exec(ep.air_date || "");
+      if (!m) continue;
+      const y = m[1], mo = m[2];
+      if (!idx[y]) idx[y] = { _total: 0 };
+      if (!idx[y][mo]) idx[y][mo] = [];
+      idx[y][mo].push(ep);
+      idx[y]._total++;
+    }
+    return idx;
+  }
+
+  // Deterministic-per-day random pick. Same episode for everyone visiting today.
+  function tonightsPick(eps) {
+    if (!eps.length) return null;
+    const indexed = eps.filter(e => e.transcript_status === "done");
+    const pool = indexed.length ? indexed : eps;
+    const d = new Date();
+    const seed = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    let h = 5381;
+    for (let i = 0; i < seed.length; i++) h = ((h * 33) ^ seed.charCodeAt(i)) >>> 0;
+    return pool[h % pool.length];
+  }
+
+  const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  async function ensureAllEpisodes() {
+    if (state.allEpisodes) return state.allEpisodes;
+    const data = await api("/api/episodes");
+    state.allEpisodes = data.episodes;
+    state.yearIndex = buildYearIndex(data.episodes);
+    return state.allEpisodes;
+  }
+
+  async function renderHome(routeYear, routeMonth) {
+    state.view = "home";
+    showSection("home");
+    setMeta({ title: SITE_NAME, description: BASE_DESC });
     setStatus("Listening for whispers…", "loading");
-    try {
-      const data = await api("/api/episodes");
-      state.allEpisodes = data.episodes;
-      if (!data.episodes.length) {
-        $results.innerHTML =
-          `<div class="empty"><h2>Nothing here yet</h2>
-           <div>Try a different filter to summon the full archive.</div></div>`;
-        setStatus("");
-        return;
-      }
-      setStatus(
-        `${data.episodes.length} broadcast${data.episodes.length > 1 ? "s" : ""} unearthed`
-      );
-      $results.innerHTML = data.episodes.map((ep, i) => `
-        <div class="card episode-card card-appear" data-ep-id="${ep.id}" style="animation-delay: ${Math.min(i, 20) * 18}ms">
-          <div>
-            <div class="card-title">${escapeHtml(ep.title)}</div>
-            <div class="card-date">${fmtDate(ep.air_date)}${ep.duration_sec ? " · " + fmtTs(ep.duration_sec) : ""}</div>
-          </div>
-          <div class="ep-segs">${ep.segment_count} markers</div>
-        </div>
-      `).join("");
-      $results.querySelectorAll(".episode-card").forEach(el => {
-        el.addEventListener("click", () => {
-          location.hash = `#/ep/${el.dataset.epId}`;
+
+    let eps;
+    try { eps = await ensureAllEpisodes(); }
+    catch { setStatus("Could not reach the archive.", "error"); return; }
+    if (!eps.length) {
+      setStatus("");
+      $browseGrid.innerHTML =
+        `<div class="empty"><h2>Nothing here yet</h2><div>The archive is empty.</div></div>`;
+      return;
+    }
+
+    setStatus(`${eps.length} broadcasts unearthed`);
+
+    // ── Continue listening hero ──────────────────────────────────────
+    renderHero(eps);
+
+    // ── Tonight's pick + recently played + most played ───────────────
+    renderTonight(eps);
+    renderRecent(eps);
+    renderMostPlayed(eps);
+
+    // ── Browse: years + months + grid ────────────────────────────────
+    const years = Object.keys(state.yearIndex).sort();
+    const defaultYear = years[years.length - 1];
+    const activeYear = state.yearIndex[routeYear] ? routeYear : defaultYear;
+    const yearData = state.yearIndex[activeYear];
+    const monthsInYear = Object.keys(yearData).filter(k => k !== "_total").sort();
+    const activeMonth = (routeMonth && yearData[routeMonth]) ? routeMonth : null;
+
+    $yearPills.innerHTML = years.map(y => `
+      <button type="button" class="year-pill${y === activeYear ? " active" : ""}" data-year="${y}" role="tab" aria-selected="${y === activeYear}">
+        ${y}<span class="pill-count">${state.yearIndex[y]._total}</span>
+      </button>
+    `).join("");
+    $yearPills.querySelectorAll(".year-pill").forEach(btn => {
+      btn.addEventListener("click", () => {
+        location.hash = `#/y/${btn.dataset.year}`;
+      });
+    });
+
+    if (monthsInYear.length > 1) {
+      $monthPills.classList.remove("hidden");
+      $monthPills.innerHTML = `
+        <button type="button" class="month-pill${!activeMonth ? " active" : ""}" data-month="" role="tab" aria-selected="${!activeMonth}">All</button>
+        ${monthsInYear.map(mo => `
+          <button type="button" class="month-pill${mo === activeMonth ? " active" : ""}" data-month="${mo}" role="tab" aria-selected="${mo === activeMonth}">
+            ${MONTH_NAMES[parseInt(mo, 10) - 1]}<span class="pill-count">${yearData[mo].length}</span>
+          </button>
+        `).join("")}
+      `;
+      $monthPills.querySelectorAll(".month-pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const m = btn.dataset.month;
+          location.hash = m ? `#/y/${activeYear}/${m}` : `#/y/${activeYear}`;
         });
       });
-    } catch (e) {
-      setStatus("Could not reach the archive.", "error");
+    } else {
+      $monthPills.classList.add("hidden");
+      $monthPills.innerHTML = "";
     }
+
+    // Episodes to show in the browse grid.
+    let showEps;
+    if (activeMonth) {
+      showEps = yearData[activeMonth].slice();
+    } else {
+      showEps = monthsInYear.flatMap(mo => yearData[mo]);
+    }
+    // Newest first within the selected range.
+    showEps.sort((a, b) => (b.air_date || "").localeCompare(a.air_date || ""));
+
+    const label = activeMonth
+      ? `${MONTH_NAMES[parseInt(activeMonth, 10) - 1]} ${activeYear} · ${showEps.length} episode${showEps.length === 1 ? "" : "s"}`
+      : `${activeYear} · ${showEps.length} episode${showEps.length === 1 ? "" : "s"}`;
+    $browseSub.textContent = label;
+
+    $browseGrid.innerHTML = showEps.map((ep, i) => cardHtml(ep, i)).join("");
+    wireEpisodeCards($browseGrid);
+  }
+
+  // ── Hero: continue listening ──────────────────────────────────────────
+  function renderHero(eps) {
+    const inProg = historyInProgress();
+    if (!inProg.length) { $heroResume.classList.add("hidden"); return; }
+    // Find the most recently touched in-progress episode that we still have
+    // in the archive (entries for deleted episodes are quietly ignored).
+    const epById = new Map(eps.map(e => [e.id, e]));
+    const top = inProg.find(r => epById.has(r.id));
+    if (!top) { $heroResume.classList.add("hidden"); return; }
+    const ep = epById.get(top.id);
+    $heroResume.classList.remove("hidden");
+    $heroResume.dataset.epId = ep.id;
+    $heroResume.dataset.pos = String(top.pos || 0);
+    $heroResume.dataset.dur = String(top.dur || ep.duration_sec || 0);
+    $heroTitle.textContent = ep.title;
+    $heroMeta.textContent = `${fmtDate(ep.air_date)} · ${fmtTs(top.pos || 0)} / ${fmtTs(top.dur || ep.duration_sec || 0)}`;
+    $heroProgressFill.style.width = `${(top.pct * 100).toFixed(1)}%`;
+    $heroResumeTime.textContent = `from ${fmtTs(top.pos || 0)}`;
+  }
+
+  // ── Tonight's pick (deterministic per day) ────────────────────────────
+  function renderTonight(eps) {
+    const pick = tonightsPick(eps);
+    if (!pick) { $railTonight.classList.add("hidden"); return; }
+    $railTonight.classList.remove("hidden");
+    $railTonightCards.innerHTML = cardHtml(pick, 0);
+    wireEpisodeCards($railTonightCards);
+  }
+
+  // ── Recently played rail ──────────────────────────────────────────────
+  function renderRecent(eps) {
+    const recent = historyRecent(8);
+    if (!recent.length) { $railRecent.classList.add("hidden"); return; }
+    const epById = new Map(eps.map(e => [e.id, e]));
+    const items = recent
+      .map(r => epById.get(r.id))
+      .filter(Boolean)
+      .slice(0, 6);
+    if (!items.length) { $railRecent.classList.add("hidden"); return; }
+    $railRecent.classList.remove("hidden");
+    $railRecentCards.innerHTML = items.map((ep, i) => cardHtml(ep, i)).join("");
+    wireEpisodeCards($railRecentCards);
+  }
+
+  // ── Most played rail (server-side, global across all visitors) ──────
+  async function renderMostPlayed(_eps) {
+    try {
+      const data = await api("/api/popular", { limit: 3 });
+      const items = data.episodes || [];
+      if (!items.length) { $railMostPlayed.classList.add("hidden"); return; }
+      $railMostPlayed.classList.remove("hidden");
+      $railMostPlayedCards.innerHTML = items.map((ep, i) => cardHtml(ep, i)).join("");
+      wireEpisodeCards($railMostPlayedCards);
+    } catch {
+      $railMostPlayed.classList.add("hidden");
+    }
+  }
+
+  // Ping /api/play once per (episode, device) after >=15 seconds played.
+  // localStorage flag prevents double-counting on this device.
+  const PINGED_KEY_PREFIX = "bfa_pinged_";
+  function maybePingPlay(epId, pos) {
+    if (!epId || pos < HIST_MIN_POS_SEC) return;
+    const key = PINGED_KEY_PREFIX + epId;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); }
+    catch { return; }
+    fetch("/api/play", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ episode_id: epId }),
+    }).then(r => {
+      if (!r.ok) { try { localStorage.removeItem(key); } catch {} }
+    }).catch(() => { try { localStorage.removeItem(key); } catch {} });
+  }
+
+  // Play an episode in place — used by every homepage card click. Resumes
+  // at saved position when there is one, otherwise starts from 0. The URL
+  // does NOT change, so the user stays on whatever browse view they were
+  // looking at. The segments page is still reachable by clicking the
+  // now-playing title in the player bar.
+  async function playEpisodeInline(epId, opts = {}) {
+    let ep = state.allEpisodes?.find(e => e.id === epId);
+    if (!ep) {
+      try { const d = await api(`/api/episode/${epId}`); ep = d.episode; }
+      catch { setStatus("Could not load that broadcast.", "error"); return; }
+    }
+    let startSec = opts.start;
+    if (startSec == null) {
+      const st = historyStatus(epId);
+      startSec = (st && st.status === "in_progress") ? (st.pos || 0) : 0;
+    }
+    playEpisodeAt(ep, startSec);
+  }
+
+  // Common click/context-menu wiring for any container holding episode cards.
+  function wireEpisodeCards(container) {
+    container.querySelectorAll(".episode-card").forEach(card => {
+      card.addEventListener("click", () => {
+        playEpisodeInline(card.dataset.epId);
+      });
+      // Right-click (desktop) and long-press (touch) → context menu.
+      card.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        openCardMenu(e.clientX, e.clientY, card.dataset.epId);
+      });
+      let pressTimer = null;
+      card.addEventListener("touchstart", e => {
+        const t = e.touches[0];
+        pressTimer = setTimeout(() => {
+          openCardMenu(t.clientX, t.clientY, card.dataset.epId);
+        }, 520);
+      }, { passive: true });
+      const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+      card.addEventListener("touchend", cancelPress);
+      card.addEventListener("touchmove", cancelPress);
+      card.addEventListener("touchcancel", cancelPress);
+    });
   }
 
   async function renderSearch(q) {
     state.view = "results";
     state.query = q;
     $q.value = q;
-    $transcript.classList.add("hidden");
-    $results.classList.remove("hidden");
+    showSection("results");
     setMeta({
       title: `"${q}" — ${SITE_NAME}`,
       description: `Search results for "${q}" in the Bhoot FM Archive.`,
@@ -437,9 +795,12 @@
           </div>
           <div class="markers">
             ${ep.hits.map(h => `
-              <button class="marker" data-ep-id="${ep.episode_id}" data-at="${h.start_sec}" aria-label="Play at ${fmtTs(h.start_sec)}">
-                ${fmtTs(h.start_sec)}
-              </button>
+              <div class="marker-group">
+                <button class="marker" data-ep-id="${ep.episode_id}" data-at="${h.start_sec}" aria-label="Play at ${fmtTs(h.start_sec)}">
+                  ${fmtTs(h.start_sec)}
+                </button>
+                <button class="marker-share" data-share-ep="${ep.episode_id}" data-share-at="${h.start_sec}" title="Copy link to this moment" aria-label="Copy link to ${fmtTs(h.start_sec)}">🔗</button>
+              </div>
             `).join("")}
           </div>
         </div>
@@ -452,6 +813,12 @@
           playEpisodeAt(data.episode, at);
         });
       });
+      $results.querySelectorAll(".marker-share").forEach(btn => {
+        btn.addEventListener("click", e => {
+          e.stopPropagation();
+          shareTimestampLink(btn.dataset.shareEp, parseFloat(btn.dataset.shareAt), btn);
+        });
+      });
     } catch (e) {
       setStatus("Search failed.", "error");
     }
@@ -459,8 +826,7 @@
 
   async function renderTranscript(episodeId, at) {
     state.view = "transcript";
-    $results.classList.add("hidden");
-    $transcript.classList.remove("hidden");
+    showSection("transcript");
     setStatus("Opening the broadcast…", "loading");
     try {
       const data = await api(`/api/episode/${episodeId}`);
@@ -494,9 +860,19 @@
           shareTimestampLink(data.episode.id, at, btn);
         });
       });
-      if (at != null && !isNaN(at)) {
-        playEpisodeAt(data.episode, at);
-        const idx = data.segments.findIndex(s => s.start_sec >= at - 1);
+      // Decide where to start playback:
+      //   1. Explicit ?at=… from the URL wins.
+      //   2. Otherwise, if there's a saved in-progress position, resume there.
+      //   3. Otherwise, start from 0.
+      let startAt = (at != null && !isNaN(at)) ? at : null;
+      if (startAt == null) {
+        const st = historyStatus(data.episode.id);
+        if (st && st.status === "in_progress") startAt = st.pos || 0;
+      }
+      if (startAt == null) startAt = 0;
+      playEpisodeAt(data.episode, startAt);
+      if (startAt > 0) {
+        const idx = data.segments.findIndex(s => s.start_sec >= startAt - 1);
         const target = $tSegs.querySelector(`.marker[data-seg-idx="${Math.max(0, idx)}"]`);
         if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
       }
@@ -621,7 +997,7 @@
     const indexed = eps.filter(e => e.transcript_status === "done");
     const pool = indexed.length ? indexed : eps;
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    location.hash = `#/ep/${pick.id}`;
+    playEpisodeInline(pick.id);
   }
 
   // ─── Rotating tagline (very subtle) ──────────────────────────────────
@@ -882,7 +1258,7 @@
     lastRouteId   = r.type === "ep" ? r.id : null;
     if (r.type === "query") return renderSearch(r.q);
     if (r.type === "ep")    return renderTranscript(r.id, r.at);
-    return renderEpisodes();
+    return renderHome(r.year, r.month);
   }
   function scrollToTop() {
     try { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }
@@ -892,6 +1268,137 @@
   // Don't let the browser restore old scroll positions when navigating
   // between hash routes — we manage scrolling deliberately in route().
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+  // ─── Position saving (listening history) ────────────────────────────
+  function saveCurrentPosition() {
+    const epId = $audio.dataset.episodeId;
+    if (!epId) return;
+    const dur = $audio.duration;
+    const pos = $audio.currentTime;
+    if (!dur || !isFinite(dur) || dur <= 0) return;
+    historyUpdate(epId, pos, dur);
+    maybePingPlay(epId, pos);
+  }
+  let posSaveInterval = null;
+  $audio.addEventListener("play", () => {
+    if (!posSaveInterval) posSaveInterval = setInterval(saveCurrentPosition, 5000);
+  });
+  $audio.addEventListener("pause", () => {
+    if (posSaveInterval) { clearInterval(posSaveInterval); posSaveInterval = null; }
+    saveCurrentPosition();
+  });
+  $audio.addEventListener("ended", () => {
+    const epId = $audio.dataset.episodeId;
+    const dur = $audio.duration;
+    if (epId && dur) historyMarkPlayed(epId, dur);
+  });
+  window.addEventListener("pagehide", saveCurrentPosition);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) saveCurrentPosition();
+  });
+
+  // ─── Hero (continue listening) actions ───────────────────────────────
+  $heroResumeBtn.addEventListener("click", () => {
+    const epId = $heroResume.dataset.epId;
+    const pos = parseFloat($heroResume.dataset.pos) || 0;
+    if (!epId) return;
+    playEpisodeInline(epId, { start: Math.floor(pos) });
+  });
+  $heroRestartBtn.addEventListener("click", () => {
+    const epId = $heroResume.dataset.epId;
+    if (!epId) return;
+    historyRemove(epId);
+    playEpisodeInline(epId, { start: 0 });
+    renderHome(readHash().year, readHash().month);
+  });
+  $heroDismissBtn.addEventListener("click", () => {
+    const epId = $heroResume.dataset.epId;
+    const dur = parseFloat($heroResume.dataset.dur) || 0;
+    if (!epId) return;
+    historyMarkPlayed(epId, dur);
+    if (state.view === "home") renderHome(readHash().year, readHash().month);
+  });
+
+  // ─── Reset listening history + recent rail clear ─────────────────────
+  if ($resetHistoryBtn) {
+    $resetHistoryBtn.addEventListener("click", () => {
+      if (!confirm("Clear all listening history on this device?")) return;
+      historyClear();
+      whisperToast("listening history cleared");
+      if (state.view === "home") renderHome(readHash().year, readHash().month);
+    });
+  }
+  if ($railRecentClear) {
+    $railRecentClear.addEventListener("click", () => {
+      if (!confirm("Clear recently-played list?")) return;
+      historyClear();
+      whisperToast("history cleared");
+      renderHome(readHash().year, readHash().month);
+    });
+  }
+
+  // ─── Card context menu (mark played / remove from history) ───────────
+  let $cardMenu = null;
+  function closeCardMenu() {
+    if ($cardMenu) { $cardMenu.remove(); $cardMenu = null; }
+    document.removeEventListener("click", closeCardMenu, true);
+    document.removeEventListener("keydown", onCardMenuKey, true);
+  }
+  function onCardMenuKey(e) { if (e.key === "Escape") closeCardMenu(); }
+  function openCardMenu(x, y, epId) {
+    if (!epId) return;
+    closeCardMenu();
+    const st = historyStatus(epId);
+    const ep = state.allEpisodes?.find(e => e.id === epId);
+    const dur = ep?.duration_sec || 0;
+    const menu = document.createElement("div");
+    menu.className = "card-menu";
+    const items = [];
+    if (!st || st.status !== "completed") {
+      items.push({ label: "✓ Mark as played", action: () => { historyMarkPlayed(epId, dur); } });
+    }
+    if (st && st.status === "in_progress") {
+      items.push({ label: "▶ Resume listening", action: () => playEpisodeInline(epId, { start: Math.floor(st.pos || 0) }) });
+    }
+    items.push({ label: "↺ Play from start", action: () => { historyRemove(epId); playEpisodeInline(epId, { start: 0 }); } });
+    items.push({ label: "📜 View segments", action: () => { location.hash = `#/ep/${epId}`; } });
+    if (st) {
+      items.push({ sep: true });
+      items.push({ label: "✕ Remove from history", danger: true, action: () => { historyRemove(epId); } });
+    }
+    menu.innerHTML = items.map(it =>
+      it.sep ? `<div class="card-menu-sep"></div>`
+             : `<button type="button" class="card-menu-item${it.danger ? " danger" : ""}">${it.label}</button>`
+    ).join("");
+    document.body.appendChild(menu);
+    // Position; clamp to viewport.
+    const r = menu.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const px = Math.min(x, vw - r.width - 8);
+    const py = Math.min(y, vh - r.height - 8);
+    menu.style.left = px + "px";
+    menu.style.top  = py + "px";
+    $cardMenu = menu;
+    // Wire each item.
+    const btnEls = menu.querySelectorAll(".card-menu-item");
+    let bi = 0;
+    items.forEach(it => {
+      if (it.sep) return;
+      const btn = btnEls[bi++];
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        try { it.action(); } finally {
+          closeCardMenu();
+          if (state.view === "home") renderHome(readHash().year, readHash().month);
+        }
+      });
+    });
+    // Close on outside click / Esc.
+    setTimeout(() => {
+      document.addEventListener("click", closeCardMenu, true);
+      document.addEventListener("keydown", onCardMenuKey, true);
+    }, 0);
+  }
 
   // Boot
   route();
