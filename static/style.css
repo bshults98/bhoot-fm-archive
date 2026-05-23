@@ -1962,13 +1962,18 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
    on the air date. Stays on-brand (no extra colors, just amplifies
    existing blood/glow tokens) and animations honour reduced-motion. */
 .episode-card.friday-13th {
+  /* Use the standard elevated card colour as the base so the card stays
+     visible against the page bg, then layer a translucent blood wash on
+     top for the F13 atmosphere. The earlier opaque-dark gradient blended
+     these cards right into the background — invisible cards are not the
+     mood we want. */
   background:
-    linear-gradient(135deg, rgba(185, 28, 28, 0.22) 0%, rgba(20, 6, 10, 0.92) 55%, rgba(7, 7, 11, 0.96) 100%),
+    linear-gradient(135deg, rgba(185, 28, 28, 0.28) 0%, rgba(185, 28, 28, 0.08) 55%, rgba(185, 28, 28, 0.02) 100%),
     var(--bg-elev);
-  border-color: rgba(185, 28, 28, 0.55);
+  border-color: rgba(185, 28, 28, 0.7);
   box-shadow:
-    0 0 22px -6px var(--blood-glow),
-    inset 0 0 30px -10px rgba(185, 28, 28, 0.35);
+    0 0 22px -4px var(--blood-glow),
+    inset 0 0 30px -8px rgba(185, 28, 28, 0.4);
   animation: f13-pulse 3.8s ease-in-out infinite;
 }
 .episode-card.friday-13th .card-title {
@@ -1996,12 +2001,12 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
 .episode-card.friday-13th { position: relative; }
 @keyframes f13-pulse {
   0%, 100% {
-    box-shadow: 0 0 22px -6px var(--blood-glow),
-                inset 0 0 30px -10px rgba(185, 28, 28, 0.35);
+    box-shadow: 0 0 22px -4px var(--blood-glow),
+                inset 0 0 30px -8px rgba(185, 28, 28, 0.4);
   }
   50% {
-    box-shadow: 0 0 34px -4px var(--blood-glow),
-                inset 0 0 44px -8px rgba(185, 28, 28, 0.55);
+    box-shadow: 0 0 36px -2px var(--blood-glow),
+                inset 0 0 48px -6px rgba(185, 28, 28, 0.6);
   }
 }
 @keyframes f13-flicker {
