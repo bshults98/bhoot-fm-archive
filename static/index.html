@@ -117,8 +117,8 @@
   </div>
   <form class="search" id="search-form" autocomplete="off" role="search">
     <input type="search" id="q" placeholder="Search in Bangla — try হাসপাতাল…" aria-label="Search episodes" maxlength="120" />
-    <button type="button" id="random-btn" class="icon-btn" title="Surprise me — play a random episode (R)" aria-label="Play a random episode">⚄</button>
-    <button type="submit" aria-label="Search episodes">⌖ search</button>
+    <button type="button" id="random-btn" class="icon-btn" title="Random episode (press R)" aria-label="Random episode">⚄</button>
+    <button type="submit" title="Search inside every episode" aria-label="Search episodes">⌖ Search</button>
   </form>
   <p class="how-to" id="how-to" lang="en">
     Search inside every episode <strong>in Bangla</strong> —
@@ -175,24 +175,37 @@
 
     <!-- Continue listening hero (only shown if there's an in-progress episode) -->
     <div id="hero-resume" class="hero hidden">
-      <div class="hero-label">▶ Continue listening</div>
-      <div class="hero-title" id="hero-title">—</div>
-      <div class="hero-meta" id="hero-meta"></div>
-      <div class="hero-progress" aria-hidden="true">
-        <div class="hero-progress-fill" id="hero-progress-fill"></div>
+      <div class="hero-label" id="hero-label">▶ Continue listening</div>
+      <div id="hero-resume-body">
+        <div class="hero-title" id="hero-title">—</div>
+        <div class="hero-meta" id="hero-meta"></div>
+        <div class="hero-progress" aria-hidden="true">
+          <div class="hero-progress-fill" id="hero-progress-fill"></div>
+        </div>
+        <div class="hero-actions">
+          <button class="hero-btn primary" id="hero-resume-btn" aria-label="Resume listening"><span aria-hidden="true">▶</span> Resume <span id="hero-resume-time" class="hero-time"></span></button>
+          <button class="hero-btn ghost" id="hero-restart-btn" aria-label="Start over from the beginning"><span aria-hidden="true">↺</span> Start over</button>
+          <button class="hero-btn ghost" id="hero-dismiss-btn" title="Mark as played" aria-label="Mark as played"><span aria-hidden="true">✓</span> Mark played</button>
+        </div>
       </div>
-      <div class="hero-actions">
-        <button class="hero-btn primary" id="hero-resume-btn" aria-label="Resume listening"><span aria-hidden="true">▶</span> Resume <span id="hero-resume-time" class="hero-time"></span></button>
-        <button class="hero-btn ghost" id="hero-restart-btn" aria-label="Start over from the beginning"><span aria-hidden="true">↺</span> Start over</button>
-        <button class="hero-btn ghost" id="hero-dismiss-btn" title="Mark as played" aria-label="Mark as played"><span aria-hidden="true">✓</span> Mark played</button>
+      <div id="hero-empty-body" class="hidden">
+        <div class="hero-title">No listening history yet</div>
+        <div class="hero-empty-lede">
+          Start with <strong>Tonight's Pick</strong> below, browse the archive by year,
+          or search for a Bangla word to dive in.
+        </div>
       </div>
     </div>
 
     <!-- Tonight's pick + Recently played -->
     <div class="rails">
       <div class="rail" id="rail-tonight">
-        <div class="rail-label">𓁹 Tonight's Pick <span class="rail-sub">— a random episode, refreshed daily. Tap to play.</span></div>
+        <div class="rail-label">𓁹 Tonight's Pick <span class="rail-sub">— a random episode, refreshed daily.</span></div>
         <div class="rail-cards" id="rail-tonight-cards"></div>
+        <div class="tonight-actions" id="tonight-actions">
+          <button type="button" class="hero-btn primary" id="tonight-play-btn" aria-label="Play tonight's pick"><span aria-hidden="true">▶</span> Play</button>
+          <button type="button" class="hero-btn ghost" id="tonight-reroll-btn" aria-label="Pick another random episode"><span aria-hidden="true">⚄</span> Pick another</button>
+        </div>
       </div>
       <div class="rail hidden" id="rail-recent">
         <div class="rail-label">⏱ Recently played <button type="button" id="rail-recent-clear" class="rail-clear" title="Clear history on this device">clear</button></div>

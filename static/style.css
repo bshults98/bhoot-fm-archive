@@ -1108,6 +1108,27 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
 }
 .hero-time { opacity: 0.85; margin-left: 4px; font-variant-numeric: tabular-nums; }
 
+/* Empty state for the hero (user has some history but nothing in progress) */
+.hero.hero-empty { padding-bottom: 18px; }
+.hero-empty-lede {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-top: 6px;
+  max-width: 56ch;
+}
+.hero-empty-lede strong { color: var(--blood-soft); font-weight: 500; }
+
+/* Tonight's pick action buttons under the feature card */
+.tonight-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+
 /* Rails (tonight's pick, recently played) */
 .rails { display: flex; flex-direction: column; gap: 22px; }
 .rail-label {

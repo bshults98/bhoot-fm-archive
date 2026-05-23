@@ -759,15 +759,36 @@
 
   // ── Hero: continue listening ──────────────────────────────────────────
   function renderHero(eps) {
+    const $resumeBody = document.getElementById("hero-resume-body");
+    const $emptyBody = document.getElementById("hero-empty-body");
+    const $label = document.getElementById("hero-label");
     const inProg = historyInProgress();
-    if (!inProg.length) { $heroResume.classList.add("hidden"); return; }
-    // Find the most recently touched in-progress episode that we still have
-    // in the archive (entries for deleted episodes are quietly ignored).
     const epById = new Map(eps.map(e => [e.id, e]));
     const top = inProg.find(r => epById.has(r.id));
-    if (!top) { $heroResume.classList.add("hidden"); return; }
+
+    if (!top) {
+      // No in-progress episode. Only show an empty-state hero if the user has
+      // *some* history (otherwise the first-run welcome covers this slot).
+      const hasAnyHistory = Object.keys(historyLoad()).length > 0;
+      if (!hasAnyHistory) {
+        $heroResume.classList.add("hidden");
+        return;
+      }
+      $heroResume.classList.remove("hidden");
+      $heroResume.classList.add("hero-empty");
+      if ($label) $label.textContent = "▶ Continue listening";
+      if ($resumeBody) $resumeBody.classList.add("hidden");
+      if ($emptyBody) $emptyBody.classList.remove("hidden");
+      delete $heroResume.dataset.epId;
+      return;
+    }
+
     const ep = epById.get(top.id);
     $heroResume.classList.remove("hidden");
+    $heroResume.classList.remove("hero-empty");
+    if ($label) $label.textContent = "▶ Continue listening";
+    if ($resumeBody) $resumeBody.classList.remove("hidden");
+    if ($emptyBody) $emptyBody.classList.add("hidden");
     $heroResume.dataset.epId = ep.id;
     $heroResume.dataset.pos = String(top.pos || 0);
     $heroResume.dataset.dur = String(top.dur || ep.duration_sec || 0);
@@ -782,8 +803,36 @@
     const pick = tonightsPick(eps);
     if (!pick) { $railTonight.classList.add("hidden"); return; }
     $railTonight.classList.remove("hidden");
+    state._tonightPick = pick;
     $railTonightCards.innerHTML = cardHtml(pick, 0);
     wireEpisodeCards($railTonightCards);
+    wireTonightActions(eps);
+  }
+
+  function wireTonightActions(eps) {
+    const $play = document.getElementById("tonight-play-btn");
+    const $reroll = document.getElementById("tonight-reroll-btn");
+    if ($play && !$play.dataset.wired) {
+      $play.dataset.wired = "1";
+      $play.addEventListener("click", () => {
+        const pick = state._tonightPick;
+        if (pick) location.hash = `#/ep/${pick.id}`;
+      });
+    }
+    if ($reroll && !$reroll.dataset.wired) {
+      $reroll.dataset.wired = "1";
+      $reroll.addEventListener("click", () => {
+        const indexed = eps.filter(e => e.transcript_status === "done");
+        const pool = indexed.length ? indexed : eps;
+        if (!pool.length) return;
+        let next;
+        do { next = pool[Math.floor(Math.random() * pool.length)]; }
+        while (pool.length > 1 && next.id === state._tonightPick?.id);
+        state._tonightPick = next;
+        $railTonightCards.innerHTML = cardHtml(next, 0);
+        wireEpisodeCards($railTonightCards);
+      });
+    }
   }
 
   // ── Recently played rail ──────────────────────────────────────────────
