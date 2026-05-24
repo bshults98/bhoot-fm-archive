@@ -7,6 +7,10 @@ transcripts/
 
 # Dev database — ingest.py writes this locally; prod DB is archive.prod.db
 archive.db
+# Prod database — uploaded to the HF Dataset by scripts/upload_db_to_dataset.py
+# at deploy time, then pulled into the Docker image at build. Never committed
+# to git (used to be ~190 MB; LFS storage was bloating the Space quota).
+archive.prod.db
 # Play-counts DB — runtime-only, created on first POST /api/play
 plays.db
 # SQLite WAL temp files — never commit these
@@ -39,7 +43,8 @@ Thumbs.db
 build/
 dist/
 
-# NOTE: archive.prod.db is intentionally NOT ignored.
-# Koyeb builds the Docker image from this repo, and the Dockerfile
-# copies archive.prod.db into the image as archive.db.
-# Run `python prepare_production_db.py` before every git push.
+# NOTE: archive.prod.db is hosted on the HF Dataset `xer2ten/bhoot-fm-archive-db`
+# and pulled into the image at Docker build time. See:
+#   - scripts/upload_db_to_dataset.py  (uploads after every prep step)
+#   - Dockerfile                       (urlretrieve at build time)
+# Repo no longer carries the DB at all.

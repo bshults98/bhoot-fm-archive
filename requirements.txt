@@ -5,5 +5,10 @@ pydantic==2.10.4
 # Optional: only activates if SENTRY_DSN is set in the Space secrets.
 # Server.py imports it lazily, so installing it does nothing on its own.
 sentry-sdk==2.19.2
+# Used by scripts/upload_db_to_dataset.py (local-only, push the prod DB to
+# the HF Dataset that the Space pulls at build time). The Docker image
+# uses plain urllib for the build-time fetch, so this dep doesn't run in
+# the container — but pinning it here keeps `setup.bat` one-step.
+huggingface_hub==0.27.0
 # upload-to-archive.py only; not needed in production image
 internetarchive==5.6.0

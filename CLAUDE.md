@@ -34,6 +34,7 @@ fallback) starting at that exact moment.
 | `server.py` | FastAPI app. Security headers (CSP, X-Frame-Options), CORS via `BFA_PUBLIC_URL`, FTS5 search with allowlist sanitization, `/api/episode/{id}/audio` proxies local mp3 with HTTP Range OR 302-redirects to source. **`/api/search` strips `snippet` server-side** so transcript text never reaches the client. Also: SEO landing pages `/episodes/{year}` & `/episode/{id}`, `/podcast.xml` RSS feed, `/sitemap.xml`, cache-busting (`?v=<version>`) for HTML asset refs. |
 | `ingest.py` | DB schema init + populates from `manifest.json` and `.json` transcript sidecars. |
 | `prepare_production_db.py` | Copies `archive.db` → `archive.prod.db`, strips `local_mp3_path`, rewrites `mp3_url` from `ia_manifest.json`, VACUUMs. |
+| `scripts/upload_db_to_dataset.py` | Pushes the freshly-built `archive.prod.db` to the HF Dataset `xer2ten/bhoot-fm-archive-db`. Called automatically by `redeploy_hf.bat`. First run creates the dataset; subsequent runs overwrite the file. Needs `huggingface-cli login` once. |
 | `schema.sql` | episodes + segments + FTS5 + sync triggers. |
 | `static/index.html`, `style.css`, `app.js`, `banglish.js` | Spooky dark theme. Hash-routed SPA + Media Session API + retry logic + Banglish→Bangla phonetic search. |
 | `static/about.html` | About / takedown page. |
@@ -48,7 +49,7 @@ fallback) starting at that exact moment.
 ### Deployment
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Python 3.12-slim. Copies `archive.prod.db` as `archive.db`, non-root user. Listens on port 7860 (HF default). |
+| `Dockerfile` | Python 3.12-slim. **Fetches `archive.prod.db` from the HF Dataset at build time** (via `urlretrieve`) instead of copying it from the build context. Non-root user. Listens on port 7860 (HF default). The `ARG DATASET_DB_VERSION` is patched per-deploy by `redeploy_hf.bat` to bust Docker's layer cache so the urlretrieve actually re-runs. |
 | `.dockerignore` | Excludes `audio/`, `.venv/`, `transcripts/`, manifests, scripts. |
 | `redeploy_hf.bat` | One-shot: ingest → prep prod DB → push to HF Space. |
 | `redeploy_koyeb.bat`, `redeploy.bat` | Older targets, dormant. |
@@ -63,7 +64,7 @@ fallback) starting at that exact moment.
 | `manifest.json` | Downloader state (mp3 source URLs, status, sizes). |
 | `ia_manifest.json` | IA upload state (per-episode IA URLs after upload). |
 | `archive.db` | Dev SQLite. |
-| `archive.prod.db` | Stripped + relinked DB shipped in the Docker image. |
+| `archive.prod.db` | Stripped + relinked DB. **Local only** — `.gitignore`-d. Uploaded to the HF Dataset `xer2ten/bhoot-fm-archive-db` by `scripts/upload_db_to_dataset.py` and pulled into the Docker image at build time via `urlretrieve`. Kept *out* of the Space repo to dodge LFS-bucket bloat (every redeploy used to add ~190 MB; the orphan-branch trick reset git history but not LFS storage). |
 | `plays.db` | Episode play counter. **Ephemeral on free-tier HF** — wiped on every restart. Either accept the resets or upgrade to HF persistent storage and set `BFA_PLAYS_DB_PATH=/data/plays.db`. |
 | `transcripts/` | `.json` (and `.docx`) sidecars from the Transcriber. **`.json` is what `ingest.py` reads.** |
 
@@ -82,10 +83,13 @@ bhoot-fm.com  ──[scripts/download_episodes.py]──►  audio/YYYY/*.mp3
 audio/*.mp3 ──[scripts/upload_to_archive.py]──► archive.org    ia_manifest.json
                                                           │
                                                           ▼
-                            [prepare_production_db.py] = archive.prod.db
+                            [prepare_production_db.py] = archive.prod.db (local-only, .gitignored)
                                                           │
                                                           ▼
-                                       [redeploy_hf.bat] ──► Hugging Face Space
+                  [scripts/upload_db_to_dataset.py] ──► HF Dataset xer2ten/bhoot-fm-archive-db
+                                                          │
+                                                          ▼
+   [redeploy_hf.bat → orphan push to Space] ──► HF Space (Dockerfile pulls DB from the Dataset)
 ```
 
 ## Current state

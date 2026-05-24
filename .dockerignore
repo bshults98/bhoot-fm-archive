@@ -14,8 +14,12 @@ __pycache__/
 *.bak
 *.log
 
-# Source DB and ingestion-only files
+# Source DB and ingestion-only files. archive.prod.db lives on the HF
+# Dataset now; the Dockerfile pulls it via urlretrieve, so it must NOT
+# ship in the build context (we'd just waste the upload bandwidth and
+# the COPY step is gone anyway).
 archive.db
+archive.prod.db
 manifest.json
 transcripts/
 scripts/
