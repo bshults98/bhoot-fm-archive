@@ -1,1 +1,7 @@
-archive.prod.db filter=lfs diff=lfs merge=lfs -text
+# archive.prod.db is hosted on the HF Dataset xer2ten/bhoot-fm-archive-db
+# and pulled into the Docker image at build time via urlretrieve. Do NOT
+# re-enable LFS tracking for it here — that's the bug we just fixed (the
+# DB was bloating both GitHub LFS and HF Space LFS at ~190 MB per
+# redeploy because .gitignore alone doesn't untrack already-tracked
+# files, and this attribute rule was auto-promoting any commit of the
+# file straight into LFS).
