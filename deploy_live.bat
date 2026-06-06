@@ -80,16 +80,22 @@ if errorlevel 1 (
 git push origin main
 if errorlevel 1 ( echo ERROR: git push to GitHub failed & pause & exit /b 1 )
 
+for /f "usebackq delims=" %%u in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$u = git config --get remote.origin.url; if ($u -match 'github.com[:/](?<repo>[^/]+/[^/.]+)(?:\.git)?$') { 'https://github.com/' + $Matches.repo + '/actions' }"`) do set ACTIONS_URL=%%u
+if not defined ACTIONS_URL set ACTIONS_URL=https://github.com
+
 echo.
 echo Done locally. GitHub Actions is now deploying the Hugging Face Space.
 echo 1. Watch GitHub Actions until the deploy workflow is green:
-echo    https://github.com/xer2ten/bhoot-fm-archive/actions/workflows/deploy-huggingface.yml
+echo    %ACTIONS_URL%
 echo 2. Then watch the Space rebuild / open the live site:
 echo    https://huggingface.co/spaces/xer2ten/bhoot-fm-archive
 echo.
+echo If GitHub shows 404, make sure you are signed into the account that can access
+echo this repository and that this workflow file has been merged to GitHub main.
+echo.
 choice /C YN /N /M "Open the GitHub Actions page now? [Y/N] "
 if errorlevel 2 goto :skip_open
-start "" "https://github.com/xer2ten/bhoot-fm-archive/actions/workflows/deploy-huggingface.yml"
+start "" "%ACTIONS_URL%"
 :skip_open
 pause
 endlocal
