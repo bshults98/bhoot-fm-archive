@@ -65,6 +65,10 @@
   const $expSleepPills = document.querySelectorAll(".exp-ctrl-pill[data-sleep]");
   const $expRatePills = document.querySelectorAll(".exp-ctrl-pill[data-rate]");
 
+  // Banglish toggle
+  const $banglishSwitch = document.getElementById("banglish-switch");
+  const BANGLISH_PREF_KEY = "bfa_banglish_enabled";
+
   // Clean up any leftover flag from the Webamp experiment.
   try { localStorage.removeItem("bfa_webamp"); } catch {}
 
@@ -94,6 +98,35 @@
 
   const SITE_NAME = "Bhoot FM Archive";
   const BASE_DESC = "Search and listen to Bengali horror radio episodes from Bhoot FM. Find ghost stories by keyword, jump to the exact moment.";
+
+  // ─── Banglish toggle ─────────────────────────────────────────────────
+  function isBanglishEnabled() {
+    try {
+      const pref = localStorage.getItem(BANGLISH_PREF_KEY);
+      // Default to true if not set
+      return pref === null ? true : pref === "true";
+    } catch {
+      return true;
+    }
+  }
+
+  function setBanglishEnabled(enabled) {
+    try {
+      localStorage.setItem(BANGLISH_PREF_KEY, String(enabled));
+    } catch {}
+  }
+
+  // Initialize Banglish toggle
+  if ($banglishSwitch) {
+    const enabled = isBanglishEnabled();
+    $banglishSwitch.setAttribute("aria-checked", String(enabled));
+    $banglishSwitch.addEventListener("click", () => {
+      const currentlyEnabled = $banglishSwitch.getAttribute("aria-checked") === "true";
+      const newState = !currentlyEnabled;
+      $banglishSwitch.setAttribute("aria-checked", String(newState));
+      setBanglishEnabled(newState);
+    });
+  }
 
   // Rotating taglines — subtle and mood-setting, bilingual.
   const TAGLINES = [
@@ -1152,7 +1185,9 @@
     // "ambulance"), transliterate to Bangla and search the converted query.
     // Transcripts are pure Bangla, so the original Latin form would otherwise
     // hit zero — this is the difference between "no results" and useful hits.
-    const tr = (typeof banglishToBangla === "function")
+    // Only transliterate if Banglish is enabled in the UI toggle.
+    const banglishEnabled = isBanglishEnabled();
+    const tr = (banglishEnabled && typeof banglishToBangla === "function")
       ? banglishToBangla(q)
       : { bangla: q, original: q, transformed: false };
     const effectiveQ = tr.transformed ? tr.bangla : q;
@@ -1728,9 +1763,13 @@
   });
 
   // ─── Easter eggs ─────────────────────────────────────────────────────
+  // Check if user prefers reduced motion (for JS-driven animations).
+  const prefersReducedMotion = () =>
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   // Tiny system for blood drips from anywhere on screen.
   function bleedAt(x, y, opts = {}) {
-    if (!$dripLayer) return;
+    if (!$dripLayer || prefersReducedMotion()) return;
     const n = opts.count ?? (3 + Math.floor(Math.random() * 4));
     for (let i = 0; i < n; i++) {
       const drop = document.createElement("div");
@@ -1750,6 +1789,7 @@
   }
   // Subtle screen-edge bleed (vignette flicker).
   function screenBleed(duration = 1400) {
+    if (prefersReducedMotion()) return;
     document.body.classList.add("bleeding");
     setTimeout(() => document.body.classList.remove("bleeding"), duration);
   }
@@ -1797,12 +1837,13 @@
   // Egg 4: while an episode is playing, every minute there's a 1-in-40
   // chance a faint shadow figure drifts across the bottom of the page.
   setInterval(() => {
-    if ($audio.paused) return;
+    if ($audio.paused || prefersReducedMotion()) return;
     if (Math.random() > 1 / 40) return;
     spawnShadow();
   }, 60_000);
 
   function spawnShadow() {
+    if (prefersReducedMotion()) return;
     const fig = document.createElement("div");
     fig.className = "shadow-figure";
     fig.style.setProperty("--y", (window.innerHeight - 80 - Math.random() * 40) + "px");

@@ -70,7 +70,50 @@
     "@type": "SearchAction",
     "target": { "@type": "EntryPoint", "urlTemplate": "/#/q/{search_term_string}" },
     "query-input": "required name=search_term_string"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Bhoot FM Archive",
+    "url": "/",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "/og-image.png"
+    },
+    "sameAs": [
+      "https://github.com/bshults98/bhoot-fm-archive"
+    ]
   }
+}
+</script>
+<script type="application/ld+json" id="schema-org">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Bhoot FM Archive",
+  "alternateName": "ভূত এফএম আর্কাইভ",
+  "url": "/",
+  "logo": "/og-image.png",
+  "description": "A non-commercial fan archive of Bhoot FM, Bangladesh's iconic late-night Bangla horror radio show hosted by RJ Russell on Radio Foorti 88.0 FM.",
+  "foundingDate": "2007",
+  "areaServed": {
+    "@type": "Country",
+    "name": "Bangladesh"
+  },
+  "knowsAbout": ["Bhoot FM", "Bengali Horror Radio", "Bangla Ghost Stories", "RJ Russell", "Radio Foorti"],
+  "sameAs": [
+    "https://github.com/bshults98/bhoot-fm-archive"
+  ]
+}
+</script>
+<script type="application/ld+json" id="schema-speakable">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "speakable": {
+    "@type": "SpeakableSpecification",
+    "cssSelector": [".seo-h1", ".seo-lede", ".seo-episode-desc"]
+  },
+  "url": "/"
 }
 </script>
 <script type="application/ld+json" id="schema-faq">
@@ -121,6 +164,15 @@
     <button type="button" id="random-btn" class="icon-btn" title="Random episode (press R)" aria-label="Random episode">⚄</button>
     <button type="submit" title="Search inside every episode" aria-label="Search episodes">⌖ Search</button>
   </form>
+  <div class="banglish-toggle" id="banglish-toggle">
+    <label class="toggle-label" for="banglish-switch">
+      <span class="toggle-text">Banglish</span>
+      <span class="toggle-hint">— English → বাংলা</span>
+    </label>
+    <button type="button" id="banglish-switch" class="toggle-switch" role="switch" aria-checked="true" aria-label="Toggle Banglish transliteration">
+      <span class="toggle-slider"></span>
+    </button>
+  </div>
   <p class="how-to" id="how-to" lang="en">
     Search inside every episode in <strong>Bangla</strong> or
     <strong>Banglish</strong> (English letters) —

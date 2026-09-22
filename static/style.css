@@ -180,6 +180,67 @@ header {
 }
 .search button:hover { background: #d62525; box-shadow: 0 0 18px rgba(255, 50, 50, 0.5); }
 .search button:active { transform: translateY(1px); }
+
+/* Banglish toggle */
+.banglish-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.toggle-text {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.toggle-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  padding: 0;
+}
+
+.toggle-switch[aria-checked="true"] {
+  background: var(--blood);
+  border-color: var(--blood);
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--bone);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch[aria-checked="true"] .toggle-slider {
+  transform: translateX(20px);
+}
 .icon-btn {
   background: var(--bg-elev);
   color: var(--blood-soft);
@@ -358,7 +419,13 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 22px; }
 }
 .card:hover { border-color: var(--blood); box-shadow: 0 0 0 1px rgba(185, 28, 28, 0.4), 0 0 28px -8px var(--blood-glow); }
 .card:hover::before { opacity: 1; transform: translateX(100%); }
-.card-appear { animation: card-rise 0.5s ease forwards; opacity: 0; }
+.card-appear {
+  animation: card-rise 0.5s ease forwards;
+  opacity: 0;
+  /* Fallback: if animation doesn't run (reduced motion, JS issues),
+     cards should still be visible after a brief moment. */
+  animation-fill-mode: forwards;
+}
 @keyframes card-rise {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1281,9 +1348,18 @@ body.scroll-locked { overflow: hidden; touch-action: none; overscroll-behavior: 
   position: absolute; top: 10px; right: 12px;
   font-family: 'Special Elite', 'Noto Sans Bengali', monospace;
   font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  z-index: 3;
 }
 .card-badge.done { color: var(--text-faint); }
 .card-badge.in-prog { color: var(--blood-soft); }
+
+/* When a Friday the 13th card has a status badge, shift the F13 mark to
+   the left side so they don't overlap. The F13 mark is decorative; the
+   status badge is functional info that must stay readable. */
+.episode-card.friday-13th:has(.card-badge) .f13-mark {
+  left: 10px;
+  right: auto;
+}
 .card-progress {
   position: absolute; left: 0; right: 0; bottom: 0;
   height: 3px;
@@ -1686,6 +1762,13 @@ body.witching-hour { filter: brightness(0.92) hue-rotate(-6deg); }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+  /* Ensure cards are visible even without animation. The .card-appear
+     class sets opacity: 0 initially; with animation disabled, we need
+     an explicit opacity: 1 override. */
+  .card-appear {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* ─── /about page ───────────────────────────────────────────────── */
@@ -1901,6 +1984,44 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
 }
 .seo-adj:hover { color: var(--blood-soft); border-bottom-color: var(--blood); }
 .seo-adj-disabled { color: var(--text-faint); opacity: 0.5; border-bottom: 1px dotted transparent; }
+
+/* Related episodes section (internal linking for SEO) */
+.seo-related {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.seo-related-title {
+  font-family: 'Special Elite', 'Noto Sans Bengali', serif;
+  font-size: 18px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.seo-related-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.seo-related-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.seo-related-list li:last-child {
+  border-bottom: none;
+}
+.seo-related-list a {
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.seo-related-list a:hover {
+  color: var(--blood-soft);
+}
+.seo-rel-date {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-left: 8px;
+}
 .seo-adj-up {
   font-family: 'Special Elite', monospace;
   font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
@@ -2048,6 +2169,7 @@ body.about-page { padding-bottom: 60px; }   /* no player bar */
   opacity: 0.95;
   pointer-events: none;
   animation: f13-flicker 4.7s infinite;
+  transition: left 0.2s, right 0.2s;
 }
 /* Cards in the main grid are position:relative already (badges / progress
    bars sit absolutely inside them). Keep this rule belt-and-braces in case

@@ -578,7 +578,8 @@ def search(
             "SELECT s.id, s.episode_id, s.start_sec, s.end_sec, "
             "snippet(segments_fts, 0, '<mark>', '</mark>', '…', 12) AS snippet, "
             "e.title AS episode_title, e.air_date AS episode_date, "
-            "e.mp3_url AS mp3_url, e.local_mp3_path AS local_mp3_path "
+            "e.mp3_url AS mp3_url, e.local_mp3_path AS local_mp3_path, "
+            "bm25(segments_fts) AS rank "
             "FROM segments_fts "
             "JOIN segments s ON s.id = segments_fts.rowid "
             "JOIN episodes e ON e.id = s.episode_id "
@@ -588,7 +589,8 @@ def search(
         if episode_id:
             sql += "AND s.episode_id = ? "
             params2.append(episode_id)
-        sql += "ORDER BY e.air_date DESC, s.start_sec ASC LIMIT ? OFFSET ?"
+        # Order by relevance (bm25, lower is better), then by date and time
+        sql += "ORDER BY rank, e.air_date DESC, s.start_sec ASC LIMIT ? OFFSET ?"
         params2.extend([limit, offset])
         rows = db.execute(sql, params2).fetchall()
 
@@ -602,6 +604,8 @@ def search(
         # behaviour stays the same; the snippet is dropped server-side so
         # we never ship transcript content.
         d.pop("snippet", None)
+        # Remove internal ranking score
+        d.pop("rank", None)
         results.append(d)
 
     return {"query": q, "total": total, "limit": limit, "offset": offset,
@@ -733,13 +737,20 @@ def sitemap():
         ).fetchall()
     years = sorted({r["air_date"][:4] for r in episodes if r["air_date"]}, reverse=True)
     urls = [
-        f"<url><loc>{base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>"
+        # Homepage - highest priority
+        f"<url><loc>{base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>",
+        # About page
+        f"<url><loc>{base}/about.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        # Podcast feed
+        f"<url><loc>{base}/podcast.xml</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>",
     ]
+    # Year pages - high priority for browsing
     for y in years:
         urls.append(
             f"<url><loc>{base}/episodes/{y}</loc>"
             f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
         )
+    # Episode pages - include lastmod for freshness signals
     for r in episodes:
         urls.append(
             f"<url><loc>{base}/episode/{r['id']}</loc>"
@@ -748,7 +759,8 @@ def sitemap():
         )
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
         + "\n".join(urls) +
         "\n</urlset>\n"
     )
@@ -985,6 +997,30 @@ def episode_page(episode_id: str):
         f'{html.escape(next_ep["air_date"])} →</a>'
     ) if next_ep else '<span class="seo-adj seo-adj-disabled">newer →</span>'
 
+    # Related episodes: 5 other episodes from the same year (internal linking).
+    related_html = ""
+    with get_db() as db:
+        related = db.execute(
+            "SELECT id, air_date, title FROM episodes "
+            "WHERE substr(air_date, 1, 4) = ? AND id != ? "
+            "ORDER BY air_date DESC LIMIT 5",
+            (year, episode_id),
+        ).fetchall()
+    if related:
+        related_items = "".join(
+            f'<li><a href="/episode/{html.escape(r["id"])}">'
+            f'{html.escape(r["title"] or r["id"])}</a>'
+            f' <span class="seo-rel-date">{html.escape(r["air_date"] or "")}</span></li>'
+            for r in related
+        )
+        related_html = f"""
+  <aside class="seo-related" aria-label="More episodes from {html.escape(year)}">
+    <h2 class="seo-related-title">More from {html.escape(year)}</h2>
+    <ul class="seo-related-list">
+      {related_items}
+    </ul>
+  </aside>"""
+
     body = f"""
 <nav class="seo-breadcrumb">
   <a href="/">Home</a> /
@@ -1013,6 +1049,7 @@ def episode_page(episode_id: str):
     <a href="/episodes/{html.escape(year)}" class="seo-adj-up">All {html.escape(year)} episodes</a>
     {next_html}
   </nav>
+  {related_html}
 </article>
 """
 
@@ -1040,6 +1077,20 @@ def episode_page(episode_id: str):
                 "productionCompany": {"@type": "RadioStation", "name": "Radio Foorti 88.0 FM"},
             },
             "url": (PUBLIC_URL or "") + f"/episode/{ep['id']}",
+        },
+        {
+            "@context": "https://schema.org",
+            "@type": "AudioObject",
+            "name": ep["title"] or "",
+            "description": f"Bhoot FM episode aired on {ep['air_date']}. Listener-submitted Bangla ghost stories with RJ Russell on Radio Foorti 88.0 FM.",
+            "encodingFormat": "audio/mpeg",
+            "contentUrl": ep["mp3_url"] or "",
+            "duration": iso_dur if iso_dur else None,
+            "inLanguage": "bn",
+            "datePublished": ep["air_date"] or "",
+            "genre": "Horror",
+            "byArtist": {"@type": "Person", "name": "RJ Russell"},
+            "isPartOf": {"@type": "RadioSeries", "name": "Bhoot FM"},
         },
     ]
 
