@@ -38,6 +38,12 @@
     "refuge": "রেফিউজ", "submerge": "সাবমার্জ",
     "poltergeist": "পল্টারগাইস্ট", "polter": "পল্টার", "geist": "গাইস্ট",
 
+    // Hospital variants (common misspellings)
+    "haspatal": "হাসপাতাল", "hashpatal": "হাসপাতাল", "hospital": "হাসপাতাল",
+    "haspatal": "হাসপাতাল", "hashpatal": "হাসপাতাল", "haspatel": "হাসপাতাল",
+    "haspital": "হাসপাতাল", "hashpital": "হাসপাতাল", "hasptal": "হাসপাতাল",
+    "hashptal": "হাসপাতাল", "haspatel": "হাসপাতাল", "hashpatel": "হাসপাতাল",
+
     // Proper nouns from Bhoot FM
     "surjo": "সূর্য", "shurjo": "সূর্য", "surja": "সূর্য", "shurja": "সূর্য",
     "chandra": "চন্দ্র", "chondro": "চন্দ্র",
