@@ -136,6 +136,19 @@ def _ensure_plays_schema() -> None:
             ")"
         )
         db.execute("CREATE INDEX IF NOT EXISTS plays_count_idx ON plays(count DESC)")
+        # Search logs for learning user queries and improving Banglish dictionary
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS search_logs ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "  query TEXT NOT NULL, "
+            "  bangla_query TEXT, "
+            "  transliterated INTEGER DEFAULT 0, "
+            "  result_count INTEGER DEFAULT 0, "
+            "  created_at INTEGER NOT NULL DEFAULT 0"
+            ")"
+        )
+        db.execute("CREATE INDEX IF NOT EXISTS search_logs_query_idx ON search_logs(query)")
+        db.execute("CREATE INDEX IF NOT EXISTS search_logs_created_idx ON search_logs(created_at)")
         db.commit()
 
 
@@ -328,6 +341,61 @@ def health():
             "       (SELECT COUNT(*) FROM episodes WHERE transcript_status='done')"
         ).fetchone()
     return {"ok": True, "episodes": eps, "segments": segs, "indexed": done}
+
+
+@app.get("/api/search-stats")
+def search_stats(days: int = Query(30, ge=1, le=365)):
+    """Search analytics for learning user queries and improving Banglish.
+    Shows top queries, zero-result queries, and transliteration usage.
+    Anonymous - no IPs or user identifiers stored."""
+    cutoff = int(time.time()) - (days * 86400)
+    with get_plays_db() as pdb:
+        # Top queries
+        top_queries = pdb.execute(
+            "SELECT query, bangla_query, transliterated, COUNT(*) as count, "
+            "AVG(result_count) as avg_results "
+            "FROM search_logs WHERE created_at > ? "
+            "GROUP BY query ORDER BY count DESC LIMIT 50",
+            (cutoff,)
+        ).fetchall()
+
+        # Zero-result queries (need dictionary entries)
+        zero_results = pdb.execute(
+            "SELECT query, bangla_query, transliterated, COUNT(*) as count "
+            "FROM search_logs WHERE created_at > ? AND result_count = 0 "
+            "GROUP BY query ORDER BY count DESC LIMIT 50",
+            (cutoff,)
+        ).fetchall()
+
+        # Transliteration stats
+        translit_stats = pdb.execute(
+            "SELECT "
+            "  COUNT(*) as total_searches, "
+            "  SUM(transliterated) as transliterated_count, "
+            "  SUM(CASE WHEN result_count = 0 THEN 1 ELSE 0 END) as zero_results "
+            "FROM search_logs WHERE created_at > ?",
+            (cutoff,)
+        ).fetchone()
+
+        # Recent searches (for debugging)
+        recent = pdb.execute(
+            "SELECT query, bangla_query, transliterated, result_count, created_at "
+            "FROM search_logs WHERE created_at > ? "
+            "ORDER BY created_at DESC LIMIT 20",
+            (cutoff,)
+        ).fetchall()
+
+    return {
+        "period_days": days,
+        "stats": {
+            "total_searches": translit_stats["total_searches"] if translit_stats else 0,
+            "transliterated_count": translit_stats["transliterated_count"] if translit_stats else 0,
+            "zero_results": translit_stats["zero_results"] if translit_stats else 0,
+        },
+        "top_queries": [dict(r) for r in top_queries],
+        "zero_result_queries": [dict(r) for r in zero_results],
+        "recent_searches": [dict(r) for r in recent],
+    }
 
 
 _CACHEABLE_HEADERS = {
@@ -607,6 +675,20 @@ def search(
         # Remove internal ranking score
         d.pop("rank", None)
         results.append(d)
+
+    # Log search for learning (anonymous - no IPs or user identifiers)
+    try:
+        with get_plays_db() as pdb:
+            pdb.execute(
+                "INSERT INTO search_logs (query, bangla_query, transliterated, result_count, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (q_norm, effective_q if 'effective_q' in locals() else q_norm,
+                 1 if (tr.get('transformed') if 'tr' in locals() else False) else 0,
+                 total, int(time.time()))
+            )
+            pdb.commit()
+    except Exception:
+        pass  # Don't fail search if logging fails
 
     return {"query": q, "total": total, "limit": limit, "offset": offset,
             "results": results}
