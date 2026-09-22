@@ -1192,7 +1192,12 @@
       : { bangla: q, original: q, transformed: false };
     const effectiveQ = tr.transformed ? tr.bangla : q;
     try {
-      const data = await api("/api/search", { q: effectiveQ, limit: 200 });
+      const data = await api("/api/search", {
+        q: effectiveQ,
+        limit: 200,
+        original_q: tr.transformed ? tr.original : null,
+        transliterated: tr.transformed ? 1 : 0,
+      });
       if (data.total === 0) {
         const hasBangla = /[ঀ-৿]/.test(q);
         const hint = hasBangla

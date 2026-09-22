@@ -611,6 +611,8 @@ def search(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10_000),
     episode_id: Optional[str] = Query(None),
+    original_q: Optional[str] = Query(None, max_length=MAX_SEARCH_LEN),
+    transliterated: bool = Query(False),
 ):
     # Rate limit before doing any DB work. Empty queries return early below,
     # but we still want to bill them against the bucket — they're cheap to
@@ -679,11 +681,12 @@ def search(
     # Log search for learning (anonymous - no IPs or user identifiers)
     try:
         with get_plays_db() as pdb:
+            # Use original_q if provided (for Banglish tracking), otherwise use q
+            log_query = original_q if original_q else q_norm
             pdb.execute(
                 "INSERT INTO search_logs (query, bangla_query, transliterated, result_count, created_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (q_norm, effective_q if 'effective_q' in locals() else q_norm,
-                 1 if (tr.get('transformed') if 'tr' in locals() else False) else 0,
+                (log_query, q_norm, 1 if transliterated else 0,
                  total, int(time.time()))
             )
             pdb.commit()
