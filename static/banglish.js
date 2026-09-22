@@ -2031,10 +2031,10 @@
 
   // ─── Phoneme tables (Avro-inspired, longest-match first) ────────────
   const VOWELS = {
-    // 'a' alone is the inherent vowel (অ); kar form is empty so consonants
-    // with no following vowel naturally read as <C>+inherent-a.
+    // 'a' after consonant produces "া" (aa kar) for explicit "a" sounds.
+    // When no vowel follows a consonant, the inherent 'a' is implicit.
     "aa": { ind: "আ", kar: "া" },
-    "a":  { ind: "অ", kar: ""  },
+    "a":  { ind: "অ", kar: "া" },
     "ii": { ind: "ঈ", kar: "ী" },
     "ee": { ind: "ঈ", kar: "ী" },
     "i":  { ind: "ই", kar: "ি" },
@@ -2050,45 +2050,111 @@
   };
 
   const CONSONANTS = {
+    // Multi-char consonants first (longest match)
     "kkh": "ক্ষ", "chh": "ছ",
-    "kh": "খ", "gh": "ঘ", "ng": "ং", "ch": "চ", "jh": "ঝ",
-    "th": "থ", "dh": "ধ", "ph": "ফ", "bh": "ভ", "sh": "শ",
-    "k": "ক", "g": "গ", "c": "চ", "j": "জ", "t": "ত", "d": "দ",
+    "kh": "খ", "gh": "ঘ", "ng": "ঙ", "ch": "চ", "jh": "ঝ",
+    "th": "ঠ", "dh": "দ", "ph": "ফ", "bh": "ভ", "sh": "শ",
+    // Single consonants - "c" before consonant clusters should be "ক"
+    "k": "ক", "g": "গ", "c": "ক", "j": "জ", "t": "ত", "d": "দ",
     "n": "ন", "p": "প", "b": "ব", "m": "ম", "y": "য়", "r": "র",
     "l": "ল", "v": "ভ", "w": "ও", "s": "স", "h": "হ", "f": "ফ",
     "z": "জ", "x": "ক্স", "q": "ক",
   };
 
+  // Special consonant clusters that form conjuncts
+  const CONJUNCTS = {
+    "cl": "ক্ল", "fl": "ফ্ল", "gl": "গ্ল", "pl": "প্ল", "bl": "ব্ল",
+    "sl": "স্ল", "kl": "ক্ল", "dr": "দ্র", "tr": "ত্র", "pr": "প্র",
+    "br": "ব্র", "kr": "ক্র", "gr": "গ্র", "fr": "ফ্র", "sr": "স্র",
+    "ng": "ঙ", "nk": "ঙ্ক", "nt": "ন্ত", "nd": "ন্দ", "mp": "ম্প",
+    "mb": "ম্ব", "nt": "ন্ট", "lt": "ল্ট", "rt": "র্ট", "rk": "র্ক",
+  };
+
   // Sorted keys for greedy longest-prefix matching.
   const VOWEL_KEYS = Object.keys(VOWELS).sort((a, b) => b.length - a.length);
   const CONSONANT_KEYS = Object.keys(CONSONANTS).sort((a, b) => b.length - a.length);
+  const CONJUNCT_KEYS = Object.keys(CONJUNCTS).sort((a, b) => b.length - a.length);
 
   function translitWord(word) {
     word = word.toLowerCase();
     let i = 0;
     let out = "";
     let lastWasConsonant = false;
+    let lastChar = "";
+
     while (i < word.length) {
       let matched = null;
       let kind = null;
-      for (const k of CONSONANT_KEYS) {
-        if (word.startsWith(k, i)) { matched = k; kind = "C"; break; }
+
+      // Try conjuncts first (longest match)
+      for (const k of CONJUNCT_KEYS) {
+        if (word.startsWith(k, i)) {
+          // Check if this should be a conjunct (followed by vowel or end)
+          const after = word[i + k.length];
+          const isVowelAfter = after && /[aeiou]/.test(after);
+          const isEnd = i + k.length >= word.length;
+          if (isVowelAfter || isEnd) {
+            matched = k;
+            kind = "CONJ";
+            break;
+          }
+        }
       }
+
+      // Try consonants
+      if (!matched) {
+        for (const k of CONSONANT_KEYS) {
+          if (word.startsWith(k, i)) {
+            // Check for double consonants (ss, ll, etc.) - don't use halant
+            const nextChar = word[i + k.length];
+            const isDouble = nextChar === k && k.length === 1;
+            // Also handle double consonant at end of word
+            const isEndAfterDouble = isDouble && (i + 2) >= word.length;
+            if (isDouble) {
+              // Double consonant - just output once
+              matched = k;
+              kind = "C_DOUBLE";
+              break;
+            }
+            matched = k;
+            kind = "C";
+            break;
+          }
+        }
+      }
+
+      // Try vowels
       if (!matched) {
         for (const k of VOWEL_KEYS) {
           if (word.startsWith(k, i)) { matched = k; kind = "V"; break; }
         }
       }
+
       if (!matched) { i++; continue; }
-      if (kind === "C") {
-        // Halant joins two adjacent consonants into a conjunct.
-        if (lastWasConsonant) out += "্";
+
+      if (kind === "CONJ") {
+        out += CONJUNCTS[matched];
+        lastWasConsonant = true;
+        lastChar = "C";
+      } else if (kind === "C_DOUBLE") {
+        // Handle double consonants without halant
         out += CONSONANTS[matched];
         lastWasConsonant = true;
+        lastChar = "C";
+        i += 2; // Skip both characters
+        continue;
+      } else if (kind === "C") {
+        // Halant joins two adjacent consonants into a conjunct.
+        // But don't use halant if this is after a conjunct
+        if (lastWasConsonant && lastChar !== "CONJ") out += "্";
+        out += CONSONANTS[matched];
+        lastWasConsonant = true;
+        lastChar = "C";
       } else {
         const v = VOWELS[matched];
         out += lastWasConsonant ? v.kar : v.ind;
         lastWasConsonant = false;
+        lastChar = "V";
       }
       i += matched.length;
     }
