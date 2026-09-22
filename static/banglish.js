@@ -27,6 +27,47 @@
   // transcripts (e.g., ভূত with long-uu vowel sign).
   // Auto-generated from transcript corpus + manual curation.
   const DICT = {
+    // English loanwords & common words (high-priority for search)
+    "change": "চেঞ্জ", "chamber": "চেম্বার", "strange": "স্ট্রেঞ্জ",
+    "danger": "ডেঞ্জার", "orange": "অরেঞ্জ", "agent": "এজেন্ট",
+    "giant": "জায়ান্ট", "urgent": "আর্জেন্ট", "emerge": "ইমার্জ",
+    "diverge": "ডাইভার্জ", "converge": "কনভার্জ", "surge": "সার্জ",
+    "merge": "মার্জ", "purge": "পার্জ", "urge": "আর্জ",
+    "page": "পেজ", "stage": "স্টেজ", "cage": "কেজ", "rage": "রেজ",
+    "wage": "ওয়েজ", "engage": "ইঙ্গেজ", "huge": "হিউজ",
+    "refuge": "রেফিউজ", "submerge": "সাবমার্জ",
+    "poltergeist": "পল্টারগাইস্ট", "polter": "পল্টার", "geist": "গাইস্ট",
+
+    // Proper nouns from Bhoot FM
+    "surjo": "সূর্য", "shurjo": "সূর্য", "surja": "সূর্য", "shurja": "সূর্য",
+    "chandra": "চন্দ্র", "chondro": "চন্দ্র",
+    "rabi": "রবি", "soma": "সোম", "mongol": "মঙ্গল",
+    "budh": "বুধ", "brihoshpoti": "বৃহস্পতি", "shukro": "শুক্র",
+    "shoni": "শনি",
+
+    // Common English words used in Bangla context
+    "ghost": "ভূত", "spirit": "আত্মা", "demon": "দৈত্য",
+    "monster": "মনস্টার", "vampire": "ভ্যাম্পায়ার", "zombie": "জম্বি",
+    "witch": "ডাইনি", "wizard": "ওইজার্ড", "magic": "ম্যাজিক",
+    "spell": "স্পেল", "curse": "অভিশাপ", "haunt": "হান্ট",
+    "haunted": "হান্টেড", "scary": "স্কেরি", "fear": "ফিয়ার",
+    "terror": "টেরর", "horror": "হরর", "night": "নাইট",
+    "dark": "ডার্ক", "shadow": "শ্যাডো", "light": "লাইট",
+    "blood": "ব্লাড", "death": "ডেথ", "life": "লাইফ",
+    "soul": "সোল", "body": "বডি", "mind": "মাইন্ড",
+    "dream": "ড্রিম", "sleep": "স্লিপ", "wake": "ওয়েক",
+    "nightmare": "নাইটমেয়ার", "fear": "ফিয়ার", "panic": "প্যানিক",
+    "danger": "ডেঞ্জার", "safe": "সেফ", "escape": "এস্কেপ",
+    "chase": "চেজ", "hide": "হাইড", "run": "রান",
+    "walk": "ওয়াক", "stop": "স্টপ", "go": "গো",
+    "come": "কাম", "leave": "লিভ", "stay": "স্টে",
+    "here": "হিয়ার", "there": "দেয়ার", "where": "হোয়্যার",
+    "when": "হোয়েন", "what": "হোয়াট", "who": "হু",
+    "why": "হোয়াই", "how": "হাউ",
+  };
+
+  // Secondary dictionary for less common words
+  const DICT2 = {
     "aabaroo": "আবারও",
     "aabba": "আব্বা",
     "aabbu": "আব্বু",
@@ -2066,8 +2107,9 @@
     "cl": "ক্ল", "fl": "ফ্ল", "gl": "গ্ল", "pl": "প্ল", "bl": "ব্ল",
     "sl": "স্ল", "kl": "ক্ল", "dr": "দ্র", "tr": "ত্র", "pr": "প্র",
     "br": "ব্র", "kr": "ক্র", "gr": "গ্র", "fr": "ফ্র", "sr": "স্র",
-    "ng": "ঙ", "nk": "ঙ্ক", "nt": "ন্ত", "nd": "ন্দ", "mp": "ম্প",
-    "mb": "ম্ব", "nt": "ন্ট", "lt": "ল্ট", "rt": "র্ট", "rk": "র্ক",
+    "nge": "ঞ্জ", "ng": "ঙ", "nk": "ঙ্ক", "nt": "ন্ত", "nd": "ন্দ",
+    "mp": "ম্প", "mb": "ম্ব", "nt": "ন্ট", "lt": "ল্ট", "rt": "র্ট",
+    "rk": "র্ক", "th": "ঠ", "dh": "দ",
   };
 
   // Sorted keys for greedy longest-prefix matching.
@@ -2165,6 +2207,7 @@
   function transliterateToken(tok) {
     const low = tok.toLowerCase();
     if (DICT[low]) return DICT[low];
+    if (typeof DICT2 !== "undefined" && DICT2[low]) return DICT2[low];
     return translitWord(low);
   }
 
